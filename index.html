@@ -1,0 +1,2600 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>澳門洗碼報表 v13.0.0</title>
+
+  <!-- 版本快取清除 -->
+  <script>
+    (function() {
+      var APP_VERSION = 'v13.0.0';
+      var stored = localStorage.getItem('macau_app_version');
+      if (stored && stored !== APP_VERSION && !sessionStorage.getItem('_v13_reloaded')) {
+        sessionStorage.setItem('_v13_reloaded', '1');
+        location.replace(location.href.split('?')[0] + '?v=' + APP_VERSION);
+      }
+      localStorage.setItem('macau_app_version', APP_VERSION);
+    })();
+  </script>
+
+  <!-- CSS (由 build.js 合并注入) -->
+  <style>
+/* css/variables.css */
+/* ============================================================================
+ * v13 CSS 设计令牌 (对照档第五节)
+ * 70% 现代科技感 + 30% 中国风 (隐性克制)
+ * ============================================================================ */
+
+:root {
+  /* 背景层次 */
+  --bg-base:        #0a0a0f;
+  --bg-surface:     #0d1117;
+  --bg-elevated:    #161b22;
+
+  /* 文字 */
+  --text-primary:   #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted:     #6e7681;
+
+  /* 科技冷色 */
+  --tech-cyan:      #00d4ff;
+  --sky-blue:       #0095ff;
+  --electric-violet:#7c3aed;
+
+  /* 中式点缀 */
+  --gold-soft:      #c9a84c;
+  --gold-light:     #D4A844;
+  --gold-dim:       #8B6914;
+  --vermilion:      #c0392b;
+
+  /* 状态色 */
+  --danger:         #f85149;
+  --warning:        #f0a500;
+  --success:        #2dd4a0;
+  --info:           #58a6ff;
+  --cash-orange:    #e67e22;
+
+  /* 边框 */
+  --border-subtle:  rgba(255,255,255,0.06);
+  --border-gold:    rgba(201,168,76,0.12);
+  --gold-border-strong: rgba(212,175,55,0.3);
+
+  /* 尺寸 */
+  --radius-sm:      8px;
+  --radius-md:      12px;
+  --radius-lg:      16px;
+  --spacing-xs:     4px;
+  --spacing-sm:     8px;
+  --spacing-md:     16px;
+  --spacing-lg:     24px;
+
+  /* 阴影 */
+  --shadow-sm:      0 2px 8px rgba(0,0,0,0.3);
+  --shadow-md:      0 4px 16px rgba(0,0,0,0.4);
+
+  /* 过渡 */
+  --trans-base:     0.2s cubic-bezier(0.4,0,0.2,1);
+
+  /* 侧边栏宽度 */
+  --sidebar-w:      200px;
+  --sidebar-collapsed: 56px;
+  --topbar-h:       56px;
+}
+
+/* ============================================================================
+ * 全域重置
+ * ============================================================================ */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 14px;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  line-height: 1.6;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+a { color: var(--tech-cyan); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* 滚动条 */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+/* 选中 */
+::selection {
+  background: rgba(0,212,255,0.25);
+  color: var(--text-primary);
+}
+
+/* 输入 */
+input, select, textarea {
+  font-family: inherit;
+  font-size: 13px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color var(--trans-base);
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--tech-cyan);
+}
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='%238b949e' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 30px;
+}
+select option {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+th, td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+th {
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+tr:hover td {
+  background: rgba(255,255,255,0.02);
+}
+
+/* css/layout.css */
+/* ============================================================================
+ * v13 布局 CSS — App Shell / Sidebar / Topbar / Page / Grid
+ * 70% 科技感 + 30% 中国风隐性
+ * ============================================================================ */
+
+/* ── App Shell ── */
+#app-shell {
+  display: flex;
+  min-height: 100vh;
+  position: relative;
+}
+
+/* ── Sidebar ── */
+#sidebar {
+  width: var(--sidebar-w);
+  min-height: 100vh;
+  background: linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg-surface) 100%);
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  z-index: 100;
+  transition: width var(--trans-base), transform var(--trans-base);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+#sidebar.collapsed {
+  width: var(--sidebar-collapsed);
+}
+#sidebar.collapsed .sb-logo-text,
+#sidebar.collapsed .sb-item span,
+#sidebar.collapsed .sb-version,
+#sidebar.collapsed .sb-divider { display: none; }
+
+/* Sidebar Logo */
+.sb-logo {
+  padding: 20px 16px 12px;
+  text-align: center;
+  border-bottom: 1px solid var(--border-gold);
+}
+.sb-logo-icon { font-size: 28px; color: var(--gold-soft); }
+.sb-logo-text { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.sb-logo-name { font-size: 15px; font-weight: 700; color: var(--text-primary); letter-spacing: 2px; }
+.sb-month {
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--gold-soft);
+  text-align: center;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Sidebar Nav */
+.sb-nav {
+  flex: 1;
+  padding: 8px 0;
+  list-style: none;
+}
+.sb-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all var(--trans-base);
+  font-size: 13px;
+  border-left: 2px solid transparent;
+  position: relative;
+}
+.sb-item:hover {
+  background: rgba(0,212,255,0.06);
+  color: var(--text-primary);
+}
+.sb-item.active {
+  background: rgba(0,212,255,0.1);
+  color: var(--tech-cyan);
+  border-left-color: var(--tech-cyan);
+}
+.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
+.sb-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-gold), transparent);
+  margin: 8px 12px;
+}
+.sb-toggle {
+  padding: 8px;
+  text-align: center;
+  cursor: pointer;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-subtle);
+  font-size: 18px;
+  user-select: none;
+}
+.sb-toggle:hover { color: var(--text-primary); }
+.sb-version {
+  padding: 6px 16px 10px;
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* Sidebar Overlay (手机) */
+#sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 99;
+}
+
+/* ── Main Content ── */
+#main-content {
+  flex: 1;
+  margin-left: var(--sidebar-w);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  transition: margin-left var(--trans-base);
+}
+#sidebar.collapsed + #sidebar-overlay + #main-content,
+#sidebar.collapsed ~ #main-content {
+  margin-left: var(--sidebar-collapsed);
+}
+
+/* ── Topbar ── */
+#topbar {
+  height: var(--topbar-h);
+  background: rgba(22,27,34,0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+#topbar-title {
+  font-size: 16px;
+  font-weight: 600;
+  flex: 1;
+  color: var(--text-primary);
+}
+#topbar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Page Scroll ── */
+#page-scroll {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+
+/* ── Section (页面内区块) ── */
+.page-section {
+  margin-bottom: 24px;
+}
+.page-section:last-child { margin-bottom: 0; }
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  position: relative;
+}
+.section-header::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 40px;
+  height: 2px;
+  background: var(--tech-cyan);
+  border-radius: 1px;
+}
+.section-header.gold::after { background: var(--gold-soft); }
+.section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.section-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ── Month Bar ── */
+.month-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+}
+#month-badge {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--gold-soft);
+}
+#month-status { font-size: 12px; color: var(--text-muted); }
+#sync-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #888;
+  transition: background 0.3s;
+}
+#sync-dot.connected { background: var(--success); }
+#sync-text { font-size: 11px; color: var(--text-muted); }
+
+/* ── Pages ── */
+.page {
+  display: none;
+  animation: pageFadeIn 0.25s ease;
+}
+.page.active { display: block; }
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── KPI Grid ── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+/* KPI Card */
+.kpi-card {
+  background: linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg-surface) 100%);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  transition: all var(--trans-base);
+  position: relative;
+  overflow: hidden;
+}
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--tech-cyan);
+  opacity: 0;
+  transition: opacity var(--trans-base);
+}
+.kpi-card:hover::before { opacity: 1; }
+.kpi-card:hover {
+  border-color: rgba(0,212,255,0.2);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  transform: translateY(-1px);
+}
+.kpi-card-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.kpi-card-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.kpi-card-value.cyan { color: var(--tech-cyan); }
+.kpi-card-value.gold { color: var(--gold-soft); }
+.kpi-card-value.green { color: var(--success); }
+.kpi-card-value.red { color: var(--danger); }
+.kpi-card-value.orange { color: var(--cash-orange); }
+.kpi-card-value.blue { color: var(--sky-blue); }
+.kpi-card-value.violet { color: var(--electric-violet); }
+
+/* ── Two Column Layout ── */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.two-col-3-7 {
+  display: grid;
+  grid-template-columns: 3fr 7fr;
+  gap: 16px;
+}
+.two-col-7-3 {
+  display: grid;
+  grid-template-columns: 7fr 3fr;
+  gap: 16px;
+}
+
+/* ── Chart Container ── */
+.chart-container {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  padding: 16px;
+  position: relative;
+}
+.chart-container.sm { height: 260px; }
+.chart-container.md { height: 320px; }
+.chart-container.lg { height: 400px; }
+.chart-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ── Timeline ── */
+.timeline-box {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  padding: 16px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/* ── Table Scroll ── */
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+}
+
+/* ── Toolbar ── */
+.toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.toolbar > input,
+.toolbar > select {
+  min-width: 120px;
+}
+
+/* ── Quick Actions ── */
+.quick-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+/* ── Empty State ── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.empty-state .empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.4;
+}
+.empty-state .empty-text {
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+.empty-state .empty-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+/* ── Dashboard Card Grid ── */
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.dash-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  text-align: center;
+  transition: all var(--trans-base);
+}
+.dash-card:hover {
+  border-color: rgba(0,212,255,0.2);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+}
+.dash-card-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+.dash-card-value { font-size: 20px; font-weight: 700; color: var(--tech-cyan); }
+
+/* ── Decorative Line ── */
+.decorative-line {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-gold), transparent);
+  margin-bottom: 20px;
+}
+
+/* ── Info Banner ── */
+.info-banner {
+  background: rgba(0,212,255,0.05);
+  border: 1px solid rgba(0,212,255,0.12);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+}
+.info-banner.warn {
+  background: rgba(240,165,0,0.05);
+  border-color: rgba(240,165,0,0.15);
+}
+.info-banner.success {
+  background: rgba(45,212,160,0.05);
+  border-color: rgba(45,212,160,0.15);
+}
+
+/* ── Content Card ── */
+.content-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.content-card.interactive:hover {
+  border-color: rgba(0,212,255,0.15);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.2);
+}
+
+/* css/components.css */
+/* ============================================================================
+ * v13 组件 CSS — 按钮 / 卡片 / Modal / Toast / 表单 / 状态标签 / 表格
+ * 70% 科技感 + 30% 中国风隐性
+ * ============================================================================ */
+
+/* ═══════════════════════════════════════════════════════
+ * 按钮系统
+ * ═══════════════════════════════════════════════════════ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  transition: all var(--trans-base);
+  white-space: nowrap;
+  user-select: none;
+  position: relative;
+  overflow: hidden;
+}
+.btn:hover {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(0,212,255,0.3);
+  color: var(--text-primary);
+}
+.btn:active {
+  transform: scale(0.97);
+}
+
+/* Primary */
+.btn-primary {
+  background: linear-gradient(135deg, var(--tech-cyan), var(--sky-blue));
+  color: #000;
+  border-color: transparent;
+  font-weight: 600;
+}
+.btn-primary:hover {
+  background: linear-gradient(135deg, #00e0ff, #00a8ff);
+  box-shadow: 0 0 16px rgba(0,212,255,0.3);
+}
+
+/* Danger */
+.btn-danger {
+  background: transparent;
+  color: var(--danger);
+  border-color: rgba(248,81,73,0.3);
+}
+.btn-danger:hover {
+  background: rgba(248,81,73,0.1);
+  border-color: var(--danger);
+  box-shadow: 0 0 12px rgba(248,81,73,0.15);
+}
+
+/* Gold */
+.btn-gold {
+  background: transparent;
+  color: var(--gold-soft);
+  border-color: var(--border-gold);
+}
+.btn-gold:hover {
+  background: rgba(201,168,76,0.1);
+  border-color: var(--gold-light);
+  box-shadow: 0 0 12px rgba(201,168,76,0.15);
+}
+
+/* Success */
+.btn-success {
+  background: transparent;
+  color: var(--success);
+  border-color: rgba(45,212,160,0.3);
+}
+.btn-success:hover {
+  background: rgba(45,212,160,0.1);
+  border-color: var(--success);
+}
+
+/* Sizes */
+.btn-sm { padding: 5px 12px; font-size: 12px; border-radius: 6px; }
+.btn-lg { padding: 10px 22px; font-size: 15px; }
+.btn-icon { width: 34px; height: 34px; padding: 0; border-radius: 50%; }
+
+/* Ghost (透明背景) */
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-secondary);
+}
+.btn-ghost:hover {
+  background: rgba(255,255,255,0.05);
+  color: var(--text-primary);
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 卡片
+ * ═══════════════════════════════════════════════════════ */
+
+.card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  transition: all var(--trans-base);
+}
+.card:hover {
+  border-color: rgba(0,212,255,0.15);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+}
+
+/* Glass 卡片 */
+.card-glass {
+  background: rgba(22,27,34,0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+/* ═══════════════════════════════════════════════════════
+ * Modal 系统
+ * ═══════════════════════════════════════════════════════ */
+
+.modal-bg {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+.modal-scroll {
+  max-height: 85vh;
+  overflow-y: auto;
+  border-radius: var(--radius-lg);
+}
+.modal {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  min-width: 420px;
+  max-width: 600px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+  animation: modalIn 0.2s ease;
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.95) translateY(-8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.modal h3 {
+  font-size: 16px;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.modal .form-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  gap: 8px;
+}
+.modal .form-row label {
+  width: 80px;
+  min-width: 80px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: right;
+}
+.modal .form-row input,
+.modal .form-row select {
+  flex: 1;
+}
+.modal .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* ── 房务 Modal ── */
+#rm-modal-bg {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+.rm-modal {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  min-width: 480px;
+  max-width: 700px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+  animation: modalIn 0.2s ease;
+}
+
+/* ── 酒店设定 Modal ── */
+#hc-modal-bg {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+.hc-modal {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  min-width: 420px;
+  max-width: 550px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+  animation: modalIn 0.2s ease;
+}
+
+/* ═══════════════════════════════════════════════════════
+ * Toast 通知
+ * ═══════════════════════════════════════════════════════ */
+
+#toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  pointer-events: none;
+  gap: 8px;
+}
+
+.toast {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 10px 18px;
+  font-size: 13px;
+  color: var(--text-primary);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  animation: toastSlideIn 0.3s ease;
+  pointer-events: auto;
+  max-width: 360px;
+}
+.toast.success { border-left: 3px solid var(--success); }
+.toast.error   { border-left: 3px solid var(--danger); }
+.toast.info    { border-left: 3px solid var(--tech-cyan); }
+.toast.warn    { border-left: 3px solid var(--warning); }
+
+@keyframes toastSlideIn {
+  from { opacity: 0; transform: translateX(40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes toastSlideOut {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(40px); }
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 加载动画
+ * ═══════════════════════════════════════════════════════ */
+
+#loading-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(10,10,15,0.8);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 250;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+}
+.loading-spinner {
+  width: 44px; height: 44px;
+  border: 3px solid var(--border-subtle);
+  border-top-color: var(--tech-cyan);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { color: var(--text-secondary); font-size: 14px; }
+
+/* ═══════════════════════════════════════════════════════
+ * 密码遮罩
+ * ═══════════════════════════════════════════════════════ */
+
+#pw-overlay {
+  display: flex;
+  position: fixed;
+  inset: 0;
+  background: var(--bg-base);
+  z-index: 500;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+#pw-box {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-gold);
+  border-radius: var(--radius-lg);
+  padding: 40px;
+  text-align: center;
+  min-width: 320px;
+  position: relative;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+}
+.pw-emblem-text { font-size: 11px; color: var(--gold-soft); letter-spacing: 4px; }
+.pw-subtitle { font-size: 10px; color: var(--text-muted); margin: 8px 0; letter-spacing: 2px; }
+.pw-title { font-size: 24px; font-weight: 700; color: var(--text-primary); letter-spacing: 4px; margin-bottom: 8px; }
+.pw-divider {
+  font-size: 12px; color: var(--text-muted);
+  padding: 8px 0 16px;
+  letter-spacing: 6px;
+  border-bottom: 1px solid var(--border-gold);
+}
+#pw-input {
+  width: 100%; padding: 10px 14px; font-size: 16px;
+  text-align: center; margin: 16px 0 8px;
+  letter-spacing: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  transition: border-color var(--trans-base);
+}
+#pw-input:focus {
+  border-color: var(--gold-soft);
+  box-shadow: 0 0 12px rgba(201,168,76,0.1);
+}
+.pw-btn {
+  width: 100%; padding: 10px;
+  background: linear-gradient(135deg, var(--gold-soft), var(--gold-light));
+  color: #000;
+  border: none; border-radius: var(--radius-sm);
+  font-size: 15px; font-weight: 600; cursor: pointer;
+  letter-spacing: 4px;
+  transition: all var(--trans-base);
+}
+.pw-btn:hover {
+  background: linear-gradient(135deg, var(--gold-light), #e0b84c);
+  box-shadow: 0 0 20px rgba(201,168,76,0.2);
+}
+#pw-error { display: none; color: var(--danger); font-size: 12px; margin-top: 8px; }
+#pw-attempts { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+#pw-version { font-size: 10px; color: var(--text-muted); margin-top: 16px; }
+
+/* 密码抖动动画 */
+@keyframes pwShake {
+  0%,100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+.pw-shake { animation: pwShake 0.4s ease; }
+
+/* ═══════════════════════════════════════════════════════
+ * 版本徽章 & 回到顶部
+ * ═══════════════════════════════════════════════════════ */
+
+#version-badge {
+  position: fixed; bottom: 12px; right: 12px;
+  font-size: 10px; color: var(--text-muted);
+  background: var(--bg-elevated); padding: 4px 10px;
+  border-radius: 20px; border: 1px solid var(--border-subtle);
+  z-index: 50;
+}
+
+#back-to-top {
+  display: none;
+  position: fixed; bottom: 44px; right: 16px;
+  width: 38px; height: 38px;
+  background: var(--bg-elevated); color: var(--text-secondary);
+  border-radius: 50%; text-align: center; line-height: 38px;
+  cursor: pointer; font-size: 18px; z-index: 50;
+  border: 1px solid var(--border-subtle);
+  transition: all var(--trans-base);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+#back-to-top:hover {
+  color: var(--tech-cyan);
+  border-color: var(--tech-cyan);
+  box-shadow: 0 0 16px rgba(0,212,255,0.2);
+  transform: translateY(-2px);
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 房务页签
+ * ═══════════════════════════════════════════════════════ */
+
+.room-tabs {
+  display: flex; gap: 4px; margin-bottom: 16px;
+}
+.room-tab {
+  padding: 8px 20px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  border-bottom: none;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  cursor: pointer; font-size: 13px;
+  transition: all var(--trans-base);
+}
+.room-tab.active {
+  background: var(--bg-elevated);
+  color: var(--tech-cyan);
+  border-color: var(--border-subtle);
+}
+.room-tab:hover:not(.active) {
+  background: rgba(255,255,255,0.03);
+  color: var(--text-primary);
+}
+.room-tab-content { display: none; }
+.room-tab-content.active { display: block; }
+
+/* ═══════════════════════════════════════════════════════
+ * 时间筛选按钮
+ * ═══════════════════════════════════════════════════════ */
+
+.tf-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  width: 100%;
+}
+.tf-row-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gold-soft);
+  white-space: nowrap;
+  margin-right: 4px;
+}
+.tf-btn {
+  padding: 6px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 20px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-base);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--trans-base);
+  min-width: 60px;
+  text-align: center;
+}
+.tf-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--tech-cyan);
+}
+.tf-btn.active {
+  background: linear-gradient(135deg, var(--tech-cyan), var(--sky-blue));
+  color: #000;
+  border-color: transparent;
+  font-weight: 700;
+  box-shadow: 0 0 16px rgba(0,212,255,0.35);
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 快速操作
+ * ═══════════════════════════════════════════════════════ */
+
+.quick-actions {
+  display: flex; gap: 8px; margin-bottom: 16px;
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 状态标签
+ * ═══════════════════════════════════════════════════════ */
+
+.status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.status-tag.confirmed {
+  background: rgba(45,212,160,0.1);
+  color: var(--success);
+}
+.status-tag.pending {
+  background: rgba(240,165,0,0.1);
+  color: var(--warning);
+}
+.status-tag.cancelled {
+  background: rgba(248,81,73,0.1);
+  color: var(--danger);
+}
+.status-tag.completed {
+  background: rgba(0,149,255,0.1);
+  color: var(--sky-blue);
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 进度条
+ * ═══════════════════════════════════════════════════════ */
+
+.progress-bar-wrap {
+  height: 8px;
+  background: var(--bg-surface);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.progress-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
+}
+.progress-bar.cyan { background: linear-gradient(90deg, var(--tech-cyan), var(--sky-blue)); }
+.progress-bar.green { background: var(--success); }
+.progress-bar.gold { background: linear-gradient(90deg, var(--gold-soft), var(--gold-light)); }
+.progress-bar.red { background: var(--danger); }
+.progress-bar.warn { background: var(--warning); }
+
+/* ═══════════════════════════════════════════════════════
+ * 表格增强
+ * ═══════════════════════════════════════════════════════ */
+
+.text-right { text-align: right; }
+.text-center { text-align: center; }
+.text-success { color: var(--success); }
+.text-danger { color: var(--danger); }
+.text-gold { color: var(--gold-soft); }
+.text-cyan { color: var(--tech-cyan); }
+.text-muted { color: var(--text-muted); }
+
+/* 数字等宽 */
+.num-mono {
+  font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 表格行高亮 */
+tr.row-new {
+  animation: rowHighlight 2s ease;
+}
+@keyframes rowHighlight {
+  0% { background: rgba(0,212,255,0.1); }
+  100% { background: transparent; }
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 分隔线
+ * ═══════════════════════════════════════════════════════ */
+
+.decorative-line {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-gold), transparent);
+  margin-bottom: 20px;
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 房务仪表板卡片 (使用 dash-card 通用类)
+ * ═══════════════════════════════════════════════════════ */
+
+.rm-stat-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+.rm-stat-value { font-size: 20px; font-weight: 700; color: var(--tech-cyan); }
+
+.rm-quota-bar-wrap {
+  height: 8px; background: var(--bg-surface);
+  border-radius: 4px; overflow: hidden; margin-top: 8px;
+}
+.rm-quota-bar {
+  height: 100%; background: linear-gradient(90deg, var(--tech-cyan), var(--sky-blue));
+  border-radius: 4px; transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 酒店设定
+ * ═══════════════════════════════════════════════════════ */
+
+.hc-filter-bar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.hc-table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+
+#hc-batch-bar {
+  background: rgba(240,165,0,0.08);
+  border: 1px solid rgba(240,165,0,0.2);
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border-radius: var(--radius-sm);
+  display: none;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+#hc-batch-count {
+  font-weight: 600;
+  color: var(--warning);
+  font-size: 13px;
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 手机底部导航
+ * ═══════════════════════════════════════════════════════ */
+
+.mobile-bottom-nav {
+  display: none;
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: rgba(22,27,34,0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border-subtle);
+  z-index: 150;
+  padding: 6px 0;
+  padding-bottom: env(safe-area-inset-bottom, 6px);
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 总钱包页
+ * ═══════════════════════════════════════════════════════ */
+
+.wallet-overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.wallet-kpi-card {
+  background: linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg-surface) 100%);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  text-align: center;
+  transition: all var(--trans-base);
+}
+.wallet-kpi-card:hover {
+  border-color: rgba(0,212,255,0.15);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.25);
+}
+.wallet-kpi-card .wk-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.wallet-kpi-card .wk-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.wk-positive { color: var(--success); }
+.wk-negative { color: var(--danger); }
+.wk-gold { color: var(--gold-soft); }
+
+/* 钱包分区 */
+.wallet-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.wallet-section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 流水表 */
+#wallet-flow-table {
+  width: 100%;
+  font-size: 13px;
+}
+#wallet-flow-table th {
+  padding: 9px 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+  text-align: left;
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+#wallet-flow-table td {
+  padding: 8px 12px;
+  color: var(--text-secondary);
+}
+.wf-deposit  { color: var(--success); }
+.wf-withdraw { color: var(--danger); }
+.wf-source { font-size: 12px; color: var(--text-muted); }
+
+/* 钱包卡片统一明细样式 (公基金 + 代理钱包共用) */
+.wallet-card-detail {
+  padding: 0 10px 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+.wallet-card-detail table { width: 100%; font-size: 11px; }
+.wallet-card-detail th {
+  padding: 5px 8px;
+  color: var(--text-muted);
+  font-weight: 500;
+  text-align: left;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+}
+.wallet-card-detail td {
+  padding: 4px 8px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  border-bottom: 1px solid var(--border-dimmer);
+}
+.wallet-card-detail tr:last-child td {
+  border-bottom: none;
+}
+
+/* 代理钱包卡片 Grid */
+.wallet-agent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+.wallet-agent-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: all var(--trans-base);
+}
+.wallet-agent-card:hover {
+  border-color: rgba(0,212,255,0.12);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.2);
+}
+.wallet-agent-card-header {
+  background: var(--bg-elevated);
+  padding: 10px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.wa-name { font-weight: 500; font-size: 13px; color: var(--text-primary); }
+.wa-balance { font-size: 16px; font-weight: 700; color: var(--gold-soft); }
+.wallet-agent-card-body {
+  padding: 8px 0;
+}
+.wallet-agent-card-body table { width: 100%; font-size: 12px; }
+.wallet-agent-card-body th {
+  padding: 5px 10px;
+  color: var(--text-muted);
+  font-weight: 500;
+  text-align: left;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.wallet-agent-card-body td {
+  padding: 4px 10px;
+  color: var(--text-secondary);
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 徽章
+ * ═══════════════════════════════════════════════════════ */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.badge-cyan { background: rgba(0,212,255,0.1); color: var(--tech-cyan); }
+.badge-gold { background: rgba(201,168,76,0.1); color: var(--gold-soft); }
+.badge-green { background: rgba(45,212,160,0.1); color: var(--success); }
+.badge-red { background: rgba(248,81,73,0.1); color: var(--danger); }
+
+/* ═══════════════════════════════════════════════════════
+ * 工具类
+ * ═══════════════════════════════════════════════════════ */
+
+.mt-xs { margin-top: 4px; }
+.mt-sm { margin-top: 8px; }
+.mt-md { margin-top: 16px; }
+.mt-lg { margin-top: 24px; }
+.mb-sm { margin-bottom: 8px; }
+.mb-md { margin-bottom: 16px; }
+.mb-lg { margin-bottom: 24px; }
+
+/* css/china-theme.css */
+/* ============================================================================
+ * v13 中国风主题 (隐性克制·30%)
+ *
+ * 手法: 极淡山水线稿背景 (<1.5% 透明度)、窗棂线条、印章感、水墨点缀
+ * 避免: 龙纹/祥云/牡丹/宫廷风/厚重发光/俗艳渐变
+ * ============================================================================ */
+
+/* ═══════════════════════════════════════════════════════
+ * 远山水墨背景
+ * ═══════════════════════════════════════════════════════ */
+
+#app-shell::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.012;
+  background:
+    /* 远山第一层 */
+    radial-gradient(ellipse 55% 28% at 18% 84%, rgba(201,168,76,0.02) 0%, transparent 70%),
+    radial-gradient(ellipse 48% 22% at 65% 87%, rgba(201,168,76,0.015) 0%, transparent 65%),
+    /* 远山第二层 */
+    radial-gradient(ellipse 40% 20% at 35% 90%, rgba(201,168,76,0.012) 0%, transparent 60%),
+    radial-gradient(ellipse 35% 18% at 80% 92%, rgba(201,168,76,0.01) 0%, transparent 55%),
+    /* 云雾层 */
+    radial-gradient(ellipse 75% 12% at 50% 78%, rgba(255,255,255,0.006) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 10% at 30% 82%, rgba(255,255,255,0.004) 0%, transparent 50%);
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 窗棂几何装饰 — 侧栏 Hover
+ * ═══════════════════════════════════════════════════════ */
+
+.sb-item::after {
+  content: '';
+  position: absolute;
+  right: 12px;
+  width: 20px;
+  height: 20px;
+  border: 1px solid rgba(201,168,76,0.15);
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.sb-item:hover::after {
+  opacity: 1;
+  animation: latticeReveal 0.4s ease forwards;
+}
+@keyframes latticeReveal {
+  0% { transform: rotate(0deg) scale(0.8); }
+  100% { transform: rotate(0deg) scale(1); }
+}
+.sb-item { position: relative; }
+
+/* ═══════════════════════════════════════════════════════
+ * 印章感 — 登录画面
+ * ═══════════════════════════════════════════════════════ */
+
+#pw-box::before {
+  content: '';
+  position: absolute;
+  top: 18px; right: 18px;
+  width: 26px; height: 26px;
+  border: 1.5px solid rgba(201,168,76,0.15);
+  border-radius: 3px;
+  transform: rotate(15deg);
+  opacity: 0.4;
+}
+#pw-box::after {
+  content: '印';
+  position: absolute;
+  top: 22px; right: 22px;
+  font-size: 14px;
+  color: rgba(201,168,76,0.15);
+  font-family: 'STKaiti', 'KaiTi', serif;
+  transform: rotate(15deg);
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 月度结算按钮 — 朱砂色
+ * ═══════════════════════════════════════════════════════ */
+
+#btn-close-month {
+  background: transparent;
+  border-color: rgba(192,57,43,0.3);
+  color: var(--vermilion);
+}
+#btn-close-month:hover {
+  background: rgba(192,57,43,0.1);
+  border-color: var(--vermilion);
+  box-shadow: 0 0 12px rgba(192,57,43,0.15);
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 三甲标识 — 金/银/铜
+ * ═══════════════════════════════════════════════════════ */
+
+tr.rank-1 td:first-child::before {
+  content: '🥇 ';
+  font-size: 12px;
+}
+tr.rank-2 td:first-child::before {
+  content: '🥈 ';
+  font-size: 12px;
+}
+tr.rank-3 td:first-child::before {
+  content: '🥉 ';
+  font-size: 12px;
+}
+tr.rank-1 td {
+  background: rgba(201,168,76,0.04);
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 装饰性分割线
+ * ═══════════════════════════════════════════════════════ */
+
+.decorative-line {
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(201,168,76,0.06) 20%,
+    rgba(201,168,76,0.12) 50%,
+    rgba(201,168,76,0.06) 80%,
+    transparent 100%
+  );
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 金边微光 — KPI 卡片悬浮
+ * ═══════════════════════════════════════════════════════ */
+
+.kpi-card:hover {
+  box-shadow: 0 0 0 1px rgba(201,168,76,0.08), 0 4px 20px rgba(0,0,0,0.3);
+}
+.dash-card:hover {
+  box-shadow: 0 0 0 1px rgba(201,168,76,0.06), 0 2px 12px rgba(0,0,0,0.25);
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 印章体版本号
+ * ═══════════════════════════════════════════════════════ */
+
+#version-badge {
+  font-family: 'STKaiti', 'KaiTi', serif;
+  letter-spacing: 1.5px;
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 登录画面标题 — 楷体优先
+ * ═══════════════════════════════════════════════════════ */
+
+.pw-title {
+  font-family: 'STKaiti', 'KaiTi', 'PingFang TC', serif;
+}
+.pw-emblem-text {
+  font-family: 'STKaiti', 'KaiTi', serif;
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 侧栏 Logo — 中式排版
+ * ═══════════════════════════════════════════════════════ */
+
+.sb-logo-name {
+  font-family: 'STKaiti', 'KaiTi', 'PingFang TC', serif;
+  letter-spacing: 3px;
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 水墨笔触 — Modal 顶部装饰线
+ * ═══════════════════════════════════════════════════════ */
+
+.modal h3::after {
+  content: '';
+  display: block;
+  width: 32px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--tech-cyan), transparent);
+  margin-top: 8px;
+  border-radius: 1px;
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 金箔斑驳 — 卡片边框微光
+ * ═══════════════════════════════════════════════════════ */
+
+.content-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(201,168,76,0.08) 50%,
+    transparent 100%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.content-card:hover::before { opacity: 1; }
+.content-card { position: relative; overflow: hidden; }
+
+/* css/mobile.css */
+/* ============================================================================
+ * v13 移动端响应式 CSS
+ * 断点: ≤700px 手机 / 701-1023 平板 / ≥1024 桌面 / ≥1400 大屏
+ * ============================================================================ */
+
+/* ═══════════════════════════════════════════════════════
+ * 手机端 (≤700px)
+ * ═══════════════════════════════════════════════════════ */
+
+@media (max-width: 700px) {
+
+  /* ── Sidebar → 抽屉式 ── */
+  #sidebar {
+    transform: translateX(-100%);
+    width: 240px;
+    position: fixed;
+    z-index: 101;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+  }
+  #sidebar.open {
+    transform: translateX(0);
+  }
+  #sidebar-overlay {
+    display: block;
+  }
+
+  /* ── Main Content ── */
+  #main-content {
+    margin-left: 0 !important;
+    padding-bottom: 68px;  /* 底部导航空间 + safe area */
+  }
+
+  /* ── Topbar ── */
+  #topbar {
+    padding: 0 12px;
+    height: 48px;
+  }
+  #topbar-title { font-size: 14px; }
+  #mobile-sb-btn {
+    display: block !important;
+    padding: 4px;
+    cursor: pointer;
+  }
+
+  /* 隐藏 topbar 按钮文字，仅图标 */
+  #topbar-actions .btn {
+    padding: 6px 8px;
+    font-size: 12px;
+    gap: 4px;
+  }
+  #topbar-actions .btn span { display: none; }
+
+  /* ── 底部导航 ── */
+  .mobile-bottom-nav {
+    display: flex;
+    justify-content: space-around;
+  }
+  .nav-item {
+    flex: 1;
+    text-align: center;
+    padding: 8px 4px 6px;
+    font-size: 10px;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    transition: color var(--trans-base);
+  }
+  .nav-item .icon { font-size: 18px; }
+  .nav-item.active { color: var(--tech-cyan); }
+  .nav-item:active { transform: scale(0.95); }
+
+  /* ── Page Content ── */
+  #page-scroll {
+    padding: 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ── Month Bar ── */
+  .month-bar {
+    padding: 10px 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 12px;
+  }
+  #month-badge { font-size: 13px; }
+  #total-wallet-badge { font-size: 11px; margin-left: 0; width: 100%; text-align: right; }
+
+  /* ── KPI Grid → 2列 ── */
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .kpi-card { padding: 12px; }
+  .kpi-card-value { font-size: 20px; }
+
+  /* ── 仪表板 Grid → 2列 ── */
+  .dash-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .dash-card { padding: 10px; }
+  .dash-card-value { font-size: 17px; }
+
+  /* ── Two Column → 单列 ── */
+  .two-col,
+  .two-col-3-7,
+  .two-col-7-3 {
+    grid-template-columns: 1fr;
+  }
+
+  /* ── 图表容器 ── */
+  .chart-container.sm,
+  .chart-container.md { height: 220px; }
+  .chart-container.lg { height: 280px; }
+
+  /* ── 表格 ── */
+  .table-scroll {
+    font-size: 12px;
+    -webkit-overflow-scrolling: touch;
+    border-radius: var(--radius-sm);
+  }
+  th, td {
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+
+  /* 操作栏 sticky 右固定 */
+  .table-scroll th:last-child,
+  .table-scroll td:last-child {
+    position: sticky;
+    right: 0;
+    background: var(--bg-surface);
+    box-shadow: -4px 0 8px rgba(0,0,0,0.3);
+    z-index: 2;
+    min-width: 54px;
+    text-align: center;
+  }
+  .table-scroll thead th:last-child {
+    z-index: 4;
+  }
+  .table-scroll tr:nth-child(even) td:last-child {
+    background: var(--bg-elevated);
+  }
+
+  /* ── Modal 全屏化 ── */
+  .modal {
+    min-width: unset !important;
+    max-width: 94vw !important;
+    width: 94vw;
+    padding: 18px;
+    max-height: 88vh;
+    border-radius: var(--radius-md);
+  }
+  .modal .form-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .modal .form-row label {
+    width: auto;
+    text-align: left;
+    font-size: 12px;
+  }
+  .modal .form-row input,
+  .modal .form-row select {
+    width: 100%;
+  }
+  .rm-modal {
+    min-width: unset;
+    max-width: 94vw;
+    width: 94vw;
+    padding: 18px;
+  }
+  .hc-modal {
+    min-width: unset;
+    max-width: 94vw;
+    width: 94vw;
+    padding: 18px;
+  }
+
+  /* ── 房务页签 ── */
+  .room-tab {
+    padding: 7px 14px;
+    font-size: 12px;
+  }
+
+  /* ── 时间筛选按钮 ── */
+  .tf-row {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+  .tf-btn {
+    padding: 5px 12px;
+    font-size: 11px;
+    min-width: 48px;
+  }
+
+  /* ── Toolbar ── */
+  .toolbar {
+    gap: 6px;
+  }
+  .toolbar > input,
+  .toolbar > select {
+    min-width: 100px;
+    font-size: 12px;
+  }
+
+  /* ── 钱包页 ── */
+  .wallet-overview {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .wallet-kpi-card { padding: 12px; }
+  .wallet-kpi-card .wk-value { font-size: 18px; }
+  .wallet-agent-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  /* ── 快捷操作 ── */
+  .quick-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* ── Toast 位置 ── */
+  #toast-container {
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    align-items: stretch;
+  }
+  .toast {
+    max-width: unset;
+    font-size: 12px;
+  }
+
+  /* ── 版本徽章 ── */
+  #version-badge {
+    bottom: 68px;
+    right: 8px;
+    font-size: 9px;
+    padding: 3px 8px;
+  }
+
+  /* ── 回到顶部 ── */
+  #back-to-top {
+    bottom: 78px;
+    right: 10px;
+    width: 34px;
+    height: 34px;
+    line-height: 34px;
+    font-size: 16px;
+  }
+
+  /* ── 密码框 ── */
+  #pw-box {
+    min-width: 280px;
+    padding: 28px 20px;
+  }
+  .pw-title { font-size: 20px; }
+
+  /* ── 酒店设定批量栏 ── */
+  #hc-batch-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  /* ── 日期选择组 ── */
+  .date-sel-group select {
+    width: 72px !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 平板端 (701-1023px)
+ * ═══════════════════════════════════════════════════════ */
+
+@media (min-width: 701px) and (max-width: 1023px) {
+  /* Sidebar 折叠 */
+  #sidebar {
+    width: var(--sidebar-collapsed);
+  }
+  #sidebar .sb-logo-text,
+  #sidebar .sb-item span,
+  #sidebar .sb-version,
+  #sidebar .sb-divider { display: none; }
+
+  #main-content {
+    margin-left: var(--sidebar-collapsed);
+  }
+
+  /* KPI Grid → 3列 */
+  .kpi-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .dash-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  /* Two Column → 单列（平板竖屏时空间有限）*/
+  .two-col-3-7,
+  .two-col-7-3 {
+    grid-template-columns: 1fr;
+  }
+
+  .modal { min-width: 380px; max-width: 600px; }
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 桌面端 (≥1024px)
+ * ═══════════════════════════════════════════════════════ */
+
+@media (min-width: 1024px) {
+  .kpi-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  #sidebar { width: var(--sidebar-w); }
+  #main-content { margin-left: var(--sidebar-w); }
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 大屏 (≥1400px)
+ * ═══════════════════════════════════════════════════════ */
+
+@media (min-width: 1400px) {
+  .kpi-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+  .dash-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+  .two-col { gap: 24px; }
+  .modal { min-width: 500px; max-width: 750px; }
+
+  #page-scroll {
+    padding: 28px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 超小屏 (≤380px) — iPhone SE 级别
+ * ═══════════════════════════════════════════════════════ */
+
+@media (max-width: 380px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+  .kpi-card { padding: 10px; }
+  .kpi-card-value { font-size: 18px; }
+  .kpi-card-label { font-size: 10px; }
+
+  .dash-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+
+  .wallet-overview {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+
+  #page-scroll { padding: 8px; }
+  #topbar { padding: 0 8px; }
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 触摸设备优化
+ * ═══════════════════════════════════════════════════════ */
+
+@media (hover: none) and (pointer: coarse) {
+  /* 增大触摸目标 */
+  .btn,
+  .nav-item,
+  .sb-item,
+  .room-tab,
+  .tf-btn {
+    min-height: 44px;
+  }
+
+  /* 移除 hover 依赖的动画 */
+  .kpi-card:hover::before { opacity: 0; }
+  .sb-item::after { display: none; }
+
+  /* 脉冲反馈替代 */
+  .btn:active,
+  .nav-item:active,
+  .tf-btn:active {
+    transform: scale(0.95);
+  }
+}
+
+
+</style>
+
+  <!-- 密码验证兜底脚本 (必须最先执行, 零外部依赖) -->
+  <script>
+    var _v13_APP_PWD = 'bWFjYXU4ODg=';  // base64('macau888')
+    function _v13b64d(s) { try { return atob(s); } catch(e) { return ''; } }
+    function _v13LoginFallback() {
+      var input = document.getElementById('pw-input');
+      var errorEl = document.getElementById('pw-error');
+      var btn = document.querySelector('.pw-btn');
+      if (!input) return;
+      var entered = input.value.trim();
+      if (!entered) {
+        if (errorEl) { errorEl.textContent = '請輸入密碼'; errorEl.style.display = 'block'; }
+        return;
+      }
+      if (entered === _v13b64d(_v13_APP_PWD)) {
+        if (errorEl) errorEl.style.display = 'none';
+        try { sessionStorage.setItem('macau_auth', '1'); } catch(e) {}
+        var overlay = document.getElementById('pw-overlay');
+        if (overlay) { overlay.style.opacity = '0'; overlay.style.transition = 'opacity 0.5s'; setTimeout(function() { overlay.style.display = 'none'; }, 500); }
+        if (typeof checkPassword === 'function') { checkPassword(entered); }
+        return;
+      }
+      if (errorEl) { errorEl.textContent = '密碼錯誤'; errorEl.style.display = 'block'; }
+      input.value = '';
+      if (btn) { btn.classList.add('pw-shake'); setTimeout(function() { btn.classList.remove('pw-shake'); }, 500); }
+    }
+    // Enter 键触发登录
+    document.addEventListener('DOMContentLoaded', function() {
+      var inp = document.getElementById('pw-input');
+      if (inp) {
+        inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') _v13LoginFallback(); });
+        inp.focus();
+      }
+    });
+  </script>
+
+  <!-- CDN 脚本: 全部 async, 不阻塞页面加载 -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js" async></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js" async></script>
+  <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.min.js" async></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" async></script>
+
+  <!-- Firebase 初始化 (等 CDN 加载后) -->
+  <script>
+    window.addEventListener('load', function() {
+      try {
+        if (typeof firebase !== 'undefined' && firebase.initializeApp) {
+          firebase.initializeApp({
+            apiKey: "AIzaSyDPLDEr5QnMQ_AD-z7Wppt2fylxWoBuxj0U",
+            authDomain: "macau-sync.firebaseapp.com",
+            databaseURL: "https://macau-sync-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "macau-sync",
+            storageBucket: "macau-sync.appspot.com",
+            messagingSenderId: "5394959664910",
+            appId: "1:5394959664910:web:f445ede79937711fdd65f",
+            measurementId: "G-8BFD758YCF"
+          });
+        }
+      } catch(e) { console.warn('[v13] Firebase init deferred'); }
+    });
+  </script>
+
+  <!-- JS: 合并后由 build.js 输出为 app.js -->
+  <script src="app.js?v=13.0.0"></script>
+</head>
+<body>
+
+  <!-- v13 启动诊断 -->
+  <div id="v13-boot-diag" style="position:fixed;top:0;left:0;z-index:99999;background:#4c1;color:#fff;padding:2px 12px;font-size:11px;font-family:monospace;display:none">⏳ 加载中...</div>
+
+  <!-- 全域载入动画 -->
+  <div id="loading-overlay">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">處理中...</div>
+  </div>
+
+  <!-- 密码保护遮罩 -->
+  <div id="pw-overlay">
+    <div id="pw-box">
+      <div class="pw-emblem-text">博盈</div>
+      <div class="pw-subtitle">BOYING INTERNATIONAL CLUB</div>
+      <div class="pw-title">博盈國際會</div>
+      <div class="pw-divider">授 權 驗 證</div>
+      <input type="password" id="pw-input" placeholder="請輸入密碼" autocomplete="off" onkeydown="if(event.key==='Enter')_v13LoginFallback()">
+      <div id="pw-error"></div>
+      <div id="pw-attempts"></div>
+      <button class="pw-btn" onclick="_v13LoginFallback()">驗 證 進 入</button>
+      <div id="pw-version">v13.0.0</div>
+    </div>
+  </div>
+
+  <!-- Toast 通知容器 -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- 主应用外框 -->
+  <div id="app-shell">
+
+    <!-- SIDEBAR -->
+    <div id="sidebar">
+      <div class="sb-logo">
+        <div class="sb-logo-icon">♠</div>
+        <div class="sb-logo-name sb-logo-text">博盈國際會</div>
+        <div class="sb-logo-text">洗碼管理系統</div>
+      </div>
+      <div class="sb-month" id="sidebar-month">2026-06</div>
+      <nav class="sb-nav" id="sb-nav">
+        <div class="sb-item active" data-page="overview"><span class="icon">📊</span><span>總覽</span></div>
+        <div class="sb-item" data-page="all"><span class="icon">📋</span><span>全部交易</span></div>
+        <div class="sb-item" data-page="query"><span class="icon">🔍</span><span>查詢</span></div>
+        <div class="sb-item" data-page="summary"><span class="icon">📈</span><span>統計</span></div>
+        <div class="sb-item" data-page="room"><span class="icon">🏨</span><span>房務系統</span></div>
+        <div class="sb-item" data-page="wallet"><span class="icon">💳</span><span>總錢包</span></div>
+        <div class="sb-divider"></div>
+        <div class="sb-item" onclick="openFundModal()"><span class="icon">🏦</span><span>公基金</span></div>
+        <div class="sb-item" onclick="openWalletModal()"><span class="icon">💰</span><span>代理錢包</span></div>
+        <div class="sb-divider"></div>
+        <div class="sb-item" onclick="exportTxsCSV()"><span class="icon">📤</span><span>匯出CSV</span></div>
+        <div class="sb-item" onclick="document.getElementById('file-input').click()"><span class="icon">📥</span><span>匯入CSV</span></div>
+      </nav>
+      <div class="sb-toggle" title="摺疊/展開">◀</div>
+      <div class="sb-version" id="sb-version">v13.0.0</div>
+    </div>
+
+    <div id="sidebar-overlay"></div>
+
+    <!-- 手机版底部导航 -->
+    <div class="mobile-bottom-nav" id="mobile-bottom-nav">
+      <div class="nav-item active" data-page="overview"><span class="icon">📊</span>總覽</div>
+      <div class="nav-item" data-page="all"><span class="icon">📋</span>交易</div>
+      <div class="nav-item" data-page="query"><span class="icon">🔍</span>查詢</div>
+      <div class="nav-item" data-page="summary"><span class="icon">📈</span>統計</div>
+      <div class="nav-item" data-page="room"><span class="icon">🏨</span>房務</div>
+      <div class="nav-item" data-page="wallet"><span class="icon">💳</span>錢包</div>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main-content">
+
+      <!-- Topbar -->
+      <div id="topbar">
+        <div id="mobile-sb-btn" style="display:none;cursor:pointer;font-size:20px" onclick="toggleMobileSidebar()">☰</div>
+        <div id="topbar-title">總覽</div>
+        <div id="topbar-actions">
+          <button class="btn btn-primary btn-sm" onclick="Events.emit('tx:new')"><span>+ 新增</span></button>
+          <button class="btn btn-sm" onclick="doBackup()"><span>📦 備份</span></button>
+          <button class="btn btn-sm" onclick="syncUploadAll();showToast('同步中…','info')"><span>🔄 同步</span></button>
+          <button class="btn btn-sm" onclick="openModal('shortcut-help-modal')"><span>⌨️ 快捷鍵</span></button>
+        </div>
+      </div>
+
+      <!-- 页面区 -->
+      <div id="page-scroll">
+
+        <!-- 月份栏 -->
+        <div class="month-bar" id="month-bar">
+          <div id="month-badge">2026-06</div>
+          <div id="month-status">工作中</div>
+          <div id="sync-dot" class="connected"></div>
+          <div id="sync-text">已同步</div>
+          <button class="btn btn-sm" id="btn-close-month" onclick="closeCurrentMonth()">🔒 月末結算</button>
+          <div id="total-wallet-badge" style="margin-left:auto;font-size:13px;color:var(--gold-soft)">💰 總錢包: ¥0</div>
+        </div>
+
+        <!-- ===== 总览页 ===== -->
+        <div class="page active" id="page-overview">
+          <div class="quick-actions">
+            <button class="btn btn-sm" onclick="Events.emit('tx:new')">+ 新增交易</button>
+            <button class="btn btn-sm" onclick="RM.openModal()">+ 新增訂房</button>
+            <button class="btn btn-sm" onclick="showPage('summary')">📊 統計報表</button>
+          </div>
+          <div class="decorative-line"></div>
+
+          <div id="ov-kpi-grid" class="kpi-grid"></div>
+
+          <div class="chart-container md chart-full">
+            <canvas></canvas>
+          </div>
+
+          <div class="two-col ov-two-col">
+            <div class="chart-container sm chart-full">
+              <canvas></canvas>
+            </div>
+            <div class="timeline-box"></div>
+          </div>
+        </div>
+
+        <!-- ===== 全部交易页 ===== -->
+        <div class="page" id="page-all">
+          <div id="all-kpi-mini" class="kpi-grid"></div>
+          <div class="toolbar">
+            <input type="text" id="all-search" placeholder="搜索..." style="width:200px" oninput="renderAll()">
+            <button class="btn btn-sm btn-primary" onclick="Events.emit('tx:new')">+ 新增</button>
+            <button class="btn btn-sm" onclick="syncUploadAll()">🔄 同步</button>
+            <button class="btn btn-sm" onclick="exportTxsCSV()">📤 匯出CSV</button>
+            <button class="btn btn-sm" onclick="document.getElementById('file-input').click()">📥 匯入CSV</button>
+            <button class="btn btn-sm" onclick="openModal('agent-mgr-modal')">👥 代理管理</button>
+          </div>
+          <div id="all-msg" style="display:none;text-align:center;padding:40px;color:var(--text-muted)">暫無交易記錄</div>
+          <div class="table-scroll">
+            <table id="all-table">
+              <thead>
+                <tr>
+                  <th>類型</th><th>日期</th><th>代理</th><th>客戶</th><th>地點</th>
+                  <th>洗碼量</th><th>佣金</th><th>碼糧</th><th>已提領</th><th>未提領</th>
+                  <th>備註</th><th>操作</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ===== 查询页 ===== -->
+        <div class="page" id="page-query">
+          <div class="toolbar">
+            <div class="tf-row">
+              <span class="tf-row-label">📅 時間篩選</span>
+              <button class="btn btn-sm tf-btn" onclick="quickFilter('lastWeek')">上週</button>
+              <button class="btn btn-sm tf-btn" onclick="quickFilter('thisWeek')">本週</button>
+              <button class="btn btn-sm tf-btn" onclick="quickFilter('thisMonth')">本月</button>
+              <button class="btn btn-sm tf-btn" onclick="quickFilter('lastMonth')">上月</button>
+              <button class="btn btn-sm tf-btn" onclick="quickFilter('thisYear')">年度</button>
+              <button class="btn btn-sm tf-btn" onclick="quickFilter('custom')">自訂</button>
+              <span style="display:none" id="query-date-range">
+                從 <input type="date" id="query-date-from" style="width:130px" onchange="doQuery()">
+                到 <input type="date" id="query-date-to" style="width:130px" onchange="doQuery()">
+              </span>
+            </div>
+          </div>
+          <div class="toolbar" style="margin-top:6px">
+            <select id="query-agent" onchange="doQuery()"><option value="">全部代理</option></select>
+            <select id="query-venue" onchange="doQuery()"><option value="">全部地點</option></select>
+            <select id="query-month" onchange="doQuery()"><option value="">全部月份</option></select>
+            <input type="text" id="query-search" placeholder="搜索..." style="width:160px" oninput="doQuery()">
+            <button class="btn btn-sm btn-primary" onclick="doQuery()">🔍 查詢</button>
+          </div>
+          <div id="query-kpi" class="kpi-grid"></div>
+          <div class="table-scroll">
+            <table id="query-table">
+              <thead id="query-thead"><tr><th>日期</th><th>代理</th><th>地點</th><th>洗碼量</th><th>碼糧</th><th>已提領</th><th>未提領</th><th>備註</th></tr></thead>
+              <tbody id="query-tbody"></tbody>
+            </table>
+          </div>
+          <div id="query-agent-summary-section" style="margin-top:20px"><strong>代理帳務匯總</strong>
+          <div class="table-scroll" style="margin-top:8px">
+            <table class="agent-summary-table">
+              <thead><tr><th>代理</th><th>洗碼量</th><th>碼糧</th><th>已提領</th><th>未提領</th><th>💰 錢包餘額</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div></div>
+        </div>
+
+        <!-- ===== 统计页 ===== -->
+        <div class="page" id="page-summary">
+          <div id="summary-kpi" class="kpi-grid"></div>
+          <div class="table-scroll">
+            <table id="summary-table">
+              <thead><tr><th>代理</th><th>場地</th><th>洗碼量</th><th>碼糧</th><th>已提領</th><th>未提領</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ===== 房务系统页 ===== -->
+        <div class="page" id="page-room">
+          <div class="room-tabs">
+            <div class="room-tab active" onclick="switchRoomTab('booking',this)">📋 訂房管理</div>
+            <div class="room-tab" onclick="switchRoomTab('config',this)">⚙ 酒店設定</div>
+          </div>
+
+          <div class="room-tab-content active" id="room-tab-booking">
+            <div class="rm-dashboard dash-grid">
+              <div class="rm-stat-card">
+                <div class="rm-stat-label">本月總洗碼量</div>
+                <div class="rm-stat-value rm-quota-volume">0萬</div>
+              </div>
+              <div class="rm-stat-card">
+                <div class="rm-stat-label">已使用轉碼數</div>
+                <div class="rm-stat-value rm-quota-used">0萬</div>
+              </div>
+              <div class="rm-stat-card">
+                <div class="rm-stat-label">本月訂房數</div>
+                <div class="rm-stat-value rm-booking-count" style="color:var(--sky-blue)">0間</div>
+              </div>
+              <div class="rm-stat-card">
+                <div class="rm-stat-label">剩餘轉碼數</div>
+                <div class="rm-stat-value rm-quota-rem">0萬</div>
+              </div>
+              <div class="rm-stat-card">
+                <div class="rm-stat-label">額度使用率</div>
+                <div class="rm-stat-value rm-quota-rate" style="color:var(--success)">0%</div>
+                <div class="rm-quota-bar-wrap"><div class="rm-quota-bar" style="width:0%"></div></div>
+              </div>
+            </div>
+            <div class="toolbar">
+              <select id="rm-agent-filter" onchange="RM.render()"><option value="">全部代理</option></select>
+              <select id="rm-month-filter" onchange="RM.render()"><option value="">全部月份</option></select>
+              <button class="btn btn-sm btn-primary" onclick="RM.openModal()">+ 新增訂房</button>
+              <button class="btn btn-sm" onclick="RM.exportCSV()">📤 匯出</button>
+              <button class="btn btn-sm" onclick="document.getElementById('rm-file-input').click()">📥 匯入</button>
+            </div>
+            <div class="table-scroll">
+              <table class="room-table">
+                <thead>
+                  <tr><th>日期</th><th>代理</th><th>客戶</th><th>體系</th><th>酒店</th><th>房型</th>
+                      <th>入住</th><th>退房</th><th>天數</th><th>單價</th><th>總費用</th><th>狀態</th><th>操作</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="room-tab-content" id="room-tab-config">
+            <div class="hc-filter-bar">
+              <select id="hc-filter-casino" onchange="hcFilter()"><option value="">全部體系</option></select>
+              <select id="hc-filter-hotel" onchange="hcFilter()"><option value="">全部酒店</option></select>
+              <input type="text" id="hc-filter-search" placeholder="搜索..." style="width:160px" oninput="hcFilter()">
+              <button class="btn btn-sm btn-primary" onclick="hcOpenModal()">+ 新增房型</button>
+              <button class="btn btn-sm" onclick="hcResetPreset()" title="重新載入最新預設數據" style="background:#6c757d;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px">🔄 重置預設</button>
+            </div>
+            <div id="hc-batch-bar" style="display:none;background:#fff3cd;padding:6px 10px;margin-bottom:6px;border-radius:6px;border:1px solid #ffc107;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <span id="hc-batch-count" style="font-weight:bold;color:#856404">已選 0 項</span>
+              <button class="btn btn-sm btn-danger" onclick="hcBatchDelete()" style="background:#dc3545;color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px">批量刪除</button>
+              <button class="btn btn-sm" onclick="hcClearSelection()" style="background:#6c757d;color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px">取消選取</button>
+            </div>
+            <div class="table-scroll">
+              <table class="hc-table">
+                <thead><tr><th style="width:36px"><input type="checkbox" id="hc-select-all" onchange="hcToggleSelectAll(this.checked)" title="全選/取消全選"></th><th>體系</th><th>酒店</th><th>CODE</th><th>房型</th><th>平日價</th><th>週末價</th><th>特殊日</th><th>門檻(萬)</th><th>操作</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== 总钱包页 ===== -->
+        <div class="page" id="page-wallet">
+          <div class="wallet-overview" id="wallet-overview"></div>
+          <div class="decorative-line"></div>
+
+          <!-- 时间筛选器 -->
+          <div class="toolbar" style="margin-bottom:0">
+            <div class="tf-row">
+              <span class="tf-row-label">📅 時間篩選</span>
+              <button class="btn btn-sm tf-btn" onclick="walletQuickFilter('lastWeek')">上週</button>
+              <button class="btn btn-sm tf-btn" onclick="walletQuickFilter('thisWeek')">本週</button>
+              <button class="btn btn-sm tf-btn" onclick="walletQuickFilter('thisMonth')">本月</button>
+              <button class="btn btn-sm tf-btn" onclick="walletQuickFilter('lastMonth')">上月</button>
+              <button class="btn btn-sm tf-btn" onclick="walletQuickFilter('thisYear')">年度</button>
+              <button class="btn btn-sm tf-btn" onclick="walletQuickFilter('custom')">自訂</button>
+              <span style="display:none" id="wallet-date-range">
+                從 <input type="date" id="wallet-date-from" style="width:130px" onchange="renderWallet()">
+                到 <input type="date" id="wallet-date-to" style="width:130px" onchange="renderWallet()">
+              </span>
+              <span id="wallet-date-display" style="margin-left:8px;font-size:12px;color:var(--text-muted)"></span>
+            </div>
+          </div>
+
+          <div class="wallet-sections">
+            <!-- 总钱包流水（合并所有金流） -->
+            <div class="wallet-section">
+              <h3 class="wallet-section-title">📊 總錢包流水</h3>
+              <div class="table-scroll">
+                <table id="wallet-flow-table">
+                  <thead><tr><th style="width:100px">日期</th><th style="width:90px">來源</th><th>類型</th><th style="text-align:right;width:110px">金額</th><th>備註</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+              <div id="wallet-flow-empty" style="display:none;text-align:center;padding:20px;color:var(--text-muted)">暫無流水記錄</div>
+            </div>
+
+            <!-- 公基金卡片 -->
+            <div class="wallet-section">
+              <h3 class="wallet-section-title">🏦 公基金</h3>
+              <div id="wallet-fund-card"></div>
+            </div>
+
+            <!-- 代理钱包明细 -->
+            <div class="wallet-section">
+              <h3 class="wallet-section-title">💰 代理錢包明細</h3>
+              <div id="wallet-agent-cards"></div>
+              <div id="wallet-agent-empty" style="display:none;text-align:center;padding:20px;color:var(--text-muted)">暫無代理錢包記錄</div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /page-scroll -->
+
+    </div><!-- /main-content -->
+
+  </div><!-- /app-shell -->
+
+  <!-- ===== MODALS ===== -->
+
+  <!-- 交易 Modal -->
+  <div class="modal-bg" id="modal">
+    <div class="modal-scroll">
+      <div class="modal">
+        <h3 id="modal-title">新增交易</h3>
+        <div id="draft-indicator" style="display:none;font-size:11px;color:var(--warning);margin-bottom:8px">📝 有未儲存的草稿</div>
+        <div class="form-row"><label>類型</label><select name="type" id="tx-type" onchange="toggleTypeFields()"><option value="rolling">轉碼</option><option value="cash">現金寄放</option></select></div>
+        <div class="form-row"><label>日期</label><input type="date" name="date" id="tx-date"></div>
+        <div class="form-row"><label>代理</label><select name="agent" id="tx-agent" onchange="_onAgentChange()"><option value="">選擇代理</option></select></div>
+        <div class="form-row"><label>客戶</label><input type="text" name="client" id="tx-client"></div>
+        <div class="form-row"><label>地點</label><select name="venue" id="tx-venue"><option value="">選擇地點</option></select></div>
+        <div class="form-row"><label>洗碼量(萬)</label><input type="number" name="volume" id="tx-volume" step="0.01" oninput="calc()"></div>
+        <div class="form-row"><label>碼佣率(%)</label><input type="number" name="rate" id="tx-rate" step="0.01" oninput="calc()"></div>
+        <div class="form-row"><label>佣金</label><input type="number" name="comm" id="tx-comm" readonly></div>
+        <div class="form-row"><label>碼糧</label><input type="number" name="bonus" id="tx-bonus" oninput="calc()"></div>
+        <div class="form-row"><label>已提領</label><input type="number" name="drawn" id="tx-drawn" oninput="calc()"></div>
+        <div class="form-row"><label>未提領</label><input type="number" name="undrawn" id="tx-undrawn" readonly></div>
+        <div class="form-row"><label>公基金</label><input type="number" name="fund" id="tx-fund" readonly></div>
+        <div class="form-row"><label>現金寄放</label><input type="number" name="cash" id="tx-cash"></div>
+        <div class="form-row"><label>備註</label><input type="text" name="note" id="tx-note"></div>
+        <div class="form-actions">
+          <button class="btn btn-sm" onclick="closeModal()">取消</button>
+          <button class="btn btn-sm btn-primary" onclick="saveForm()">儲存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 公基金 Modal -->
+  <div class="modal-bg" id="fund-modal">
+    <div class="modal-scroll">
+      <div class="modal">
+        <h3>公基金</h3>
+        <div class="form-row"><label>日期</label><input type="date" id="fund-date"></div>
+        <div class="form-row"><label>類型</label><select id="fund-type"><option value="deposit">存入</option><option value="withdraw">提領</option></select></div>
+        <div class="form-row"><label>金額</label><input type="number" id="fund-amount"></div>
+        <div class="form-row"><label>備註</label><input type="text" id="fund-note"></div>
+        <div class="form-actions">
+          <button class="btn btn-sm" onclick="closeModal('fund-modal')">取消</button>
+          <button class="btn btn-sm btn-primary" onclick="saveFundForm()">儲存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 代理钱包 Modal -->
+  <div class="modal-bg" id="agent-wallet-modal">
+    <div class="modal-scroll">
+      <div class="modal">
+        <h3 id="wallet-title">代理錢包</h3>
+        <div class="form-row"><label>代理</label><select id="wallet-agent"><option value="">選擇代理</option></select></div>
+        <div class="form-row"><label>日期</label><input type="date" id="wallet-date"></div>
+        <div class="form-row"><label>類型</label><select id="wallet-type"><option value="deposit">存入</option><option value="cash_deposit">自存現金</option><option value="withdraw">提領</option></select></div>
+        <div class="form-row"><label>金額</label><input type="number" id="wallet-amount"></div>
+        <div class="form-row"><label>備註</label><input type="text" id="wallet-note"></div>
+        <div class="form-actions">
+          <button class="btn btn-sm" onclick="closeModal('agent-wallet-modal')">取消</button>
+          <button class="btn btn-sm btn-primary" onclick="saveAgentWalletForm()">儲存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 代理管理 Modal -->
+  <div class="modal-bg" id="agent-mgr-modal">
+    <div class="modal-scroll">
+      <div class="modal">
+        <h3>代理管理</h3>
+        <div class="form-row"><label>代理名稱</label><input type="text" id="mgr-agent-name"><button class="btn btn-sm btn-primary" onclick="addAgentFromMgr()">新增</button></div>
+        <div id="agent-mgr-list" style="max-height:300px;overflow-y:auto;margin-top:12px"></div>
+        <div class="form-actions">
+          <button class="btn btn-sm" onclick="closeModal('agent-mgr-modal')">關閉</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 快捷键帮助 Modal -->
+  <div class="modal-bg" id="shortcut-help-modal">
+    <div class="modal-scroll">
+      <div class="modal">
+        <h3>⌨️ 快捷鍵</h3>
+        <div id="shortcut-list"></div>
+        <div class="form-actions">
+          <button class="btn btn-sm" onclick="closeModal('shortcut-help-modal')">關閉</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 房务 Modal -->
+  <div id="rm-modal-bg">
+    <div class="rm-modal">
+      <h3 id="rm-modal-title">新增訂房</h3>
+      <div class="form-row"><label>代理</label><select id="rm-agent"><option value="">選擇代理</option></select></div>
+      <div class="form-row"><label>客戶</label><input type="text" id="rm-client"></div>
+      <div class="form-row"><label>體系</label><select id="rm-casino" onchange="rmOnCasinoChange()"><option value="">選擇體系</option></select></div>
+      <div class="form-row"><label>酒店</label><select id="rm-hotel" onchange="rmOnHotelChange()"><option value="">選擇酒店</option></select></div>
+      <div class="form-row"><label>房型</label><select id="rm-room" onchange="rmOnRoomChange()"><option value="">選擇房型</option></select></div>
+      <div class="form-row"><label>入住</label>
+        <span class="date-sel-group">
+          <select id="rm-checkin-y" onchange="rmCalcNights()" style="width:85px"></select>
+          <select id="rm-checkin-m" onchange="rmCalcNights()" style="width:68px"></select>
+          <select id="rm-checkin-d" onchange="rmCalcNights()" style="width:68px"></select>
+        </span>
+        <input type="hidden" id="rm-checkin">
+      </div>
+      <div class="form-row"><label>退房</label>
+        <span class="date-sel-group">
+          <select id="rm-checkout-y" onchange="rmCalcNights()" style="width:85px"></select>
+          <select id="rm-checkout-m" onchange="rmCalcNights()" style="width:68px"></select>
+          <select id="rm-checkout-d" onchange="rmCalcNights()" style="width:68px"></select>
+        </span>
+        <input type="hidden" id="rm-checkout">
+      </div>
+      <div class="form-row"><label>天數</label><input type="number" id="rm-nights" readonly></div>
+      <div class="form-row"><label>單價</label><input type="number" id="rm-price" onchange="rmCalcTotal()"></div>
+      <div class="form-row"><label>總費用</label><input type="number" id="rm-total" readonly></div>
+      <div class="form-row"><label>轉碼門檻(萬)</label><input type="number" id="rm-threshold" onchange="rmUpdatePrice()"></div>
+      <div class="form-row"><label>狀態</label><input type="text" id="rm-status" readonly></div>
+      <div class="form-row"><label>備註</label><input type="text" id="rm-note"></div>
+      <div class="form-actions">
+        <button class="btn btn-sm" onclick="rmCloseModal()">取消</button>
+        <button class="btn btn-sm btn-primary" onclick="rmSaveForm()">儲存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 酒店设定 Modal -->
+  <div id="hc-modal-bg">
+    <div class="hc-modal">
+      <h3 id="hc-modal-title">編輯房型</h3>
+      <div class="form-row"><label>體系</label><select id="hc-casino" onchange="hcOnCasinoChange()"><option value="">選擇體系</option></select></div>
+      <div class="form-row"><label>酒店</label><select id="hc-hotel"><option value="">選擇酒店</option></select></div>
+      <div class="form-row"><label>CODE</label><input type="text" id="hc-code"></div>
+      <div class="form-row"><label>房型</label><input type="text" id="hc-room"></div>
+      <div class="form-row"><label>平日價</label><input type="number" id="hc-weekday"></div>
+      <div class="form-row"><label>週末價</label><input type="number" id="hc-weekend"></div>
+      <div class="form-row"><label>特殊日價</label><input type="number" id="hc-special"></div>
+      <div class="form-row"><label>轉碼門檻(萬)</label><input type="number" id="hc-threshold"></div>
+      <div class="form-actions">
+        <button class="btn btn-sm" onclick="hcCloseModal()">取消</button>
+        <button class="btn btn-sm btn-primary" onclick="hcSaveModal()">儲存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 回到顶部 -->
+  <div id="back-to-top">↑</div>
+
+  <!-- 版本徽章 -->
+  <div id="version-badge">v13.0.0</div>
+
+  <!-- 隐藏文件上传 -->
+  <input type="file" id="file-input" accept=".csv" style="display:none" onchange="handleCSVImport(event)">
+  <input type="file" id="rm-file-input" accept=".csv" style="display:none" onchange="rmHandleImport(event)">
+
+  <!-- BUILD: v13.0.0 | 2026-06-11 | 2026-06-11T13:10:33.829Z -->
+</body>
+</html>
