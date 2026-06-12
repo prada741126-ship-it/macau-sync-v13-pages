@@ -2183,6 +2183,8 @@ function validateMonthBalance(month, txs, fundWithdrawals, agentWallets) {
   var monthTxs = [];
 
   for (var i = 0; i < txs.length; i++) {
+    // ★ 防御：跳过 undefined 或没有 date 的墓碑条目
+    if (!txs[i] || !txs[i].date) continue;
     if (txs[i].date.indexOf(month) === 0) {
       monthTxs.push(txs[i]);
     }
@@ -2322,6 +2324,8 @@ function aggregateByDay(txs, month) {
   var map = {};
   for (var i = 0; i < txs.length; i++) {
     var tx = txs[i];
+    // ★ 防御：跳过 undefined 的墓碑条目
+    if (!tx) continue;
     var date = tx.date;
     if (!date) continue;
     if (month && date.indexOf(month) !== 0) continue;
@@ -2505,6 +2509,8 @@ function filterByMonth(txs, month) {
   if (!month) return txs;
   var result = [];
   for (var i = 0; i < txs.length; i++) {
+    // ★ 防御：跳过 undefined 或没有 date 的墓碑条目
+    if (!txs[i] || !txs[i].date) continue;
     if (txs[i].date.indexOf(month) === 0) {
       result.push(txs[i]);
     }
@@ -6458,13 +6464,25 @@ function _renderRecentActivity(txs) {
 function renderAll() {
   var txs = State.get('txs');
   var month = State.get('workingMonth');
-  if (month) txs = filterByMonth(txs, month);
 
-  // KPI 迷你
-  _renderAllKPI(txs);
+  // ★ try-catch 包裹，防止单个渲染阶段崩溃导致页面卡死
+  try {
+    if (month) txs = filterByMonth(txs, month);
+  } catch (e) {
+    console.error('[v13:all] filterByMonth 崩溃:', e);
+  }
 
-  // 表格
-  _renderAllTable(txs);
+  try {
+    _renderAllKPI(txs);
+  } catch (e) {
+    console.error('[v13:all] _renderAllKPI 崩溃:', e);
+  }
+
+  try {
+    _renderAllTable(txs);
+  } catch (e) {
+    console.error('[v13:all] _renderAllTable 崩溃:', e);
+  }
 }
 
 function _renderAllKPI(txs) {
@@ -6508,6 +6526,8 @@ function _renderAllTable(txs) {
 
   tbody.innerHTML = '';
   for (var i = 0; i < txs.length; i++) {
+    // ★ 防御：跳过 undefined 的墓碑条目
+    if (!txs[i]) continue;
     (function(tx) {
       var tr = h('tr', {
         'data-fbkey': tx._fbKey,
@@ -6555,7 +6575,13 @@ function _renderAllTable(txs) {
             console.log('[v13:all] deleteTx 返回: ' + (result ? '成功 (' + result._fbKey + ')' : 'null (刪除失敗!)'));
             toastCRUDDone();
             console.log('[v13:all] 🔄 重新渲染 renderAll()...');
-            renderAll();
+            try {
+              renderAll();
+            } catch (e) {
+              console.error('[v13:all] renderAll 崩潰:', e);
+              // 数据已删除并持久化，即使渲染崩溃也不会丢失
+              console.log('[v13:all] ⚠️ 數據已成功刪除，請手動刷新頁面');
+            }
             console.log('[v13:all] ✅ renderAll 完成, 當前 txs 數量: ' + State.get('txs').length);
           }
         };
@@ -7440,13 +7466,27 @@ function pad2(n) {
 function renderSummary() {
   var txs = State.get('txs');
   var month = State.get('workingMonth');
-  if (month) txs = filterByMonth(txs, month);
+
+  // ★ try-catch 包裹，防止未定义条目导致崩溃
+  try {
+    if (month) txs = filterByMonth(txs, month);
+  } catch (e) {
+    console.error('[v13:summary] filterByMonth 崩溃:', e);
+  }
 
   // KPI
-  _renderSummaryKPI(txs);
+  try {
+    _renderSummaryKPI(txs);
+  } catch (e) {
+    console.error('[v13:summary] _renderSummaryKPI 崩溃:', e);
+  }
 
   // 代理×场地表
-  _renderSummaryTable(txs);
+  try {
+    _renderSummaryTable(txs);
+  } catch (e) {
+    console.error('[v13:summary] _renderSummaryTable 崩溃:', e);
+  }
 }
 
 function _renderSummaryKPI(txs) {
