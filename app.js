@@ -298,8 +298,8 @@ var TX_TYPES = [
 // CDN 依赖 (对照档第十四节)
 // ============================================================================
 var CDN = {
-  FIREBASE_APP:      'https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js',
-  FIREBASE_DB:       'https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js',
+  FIREBASE_APP:      'https://cdn.jsdelivr.net/npm/firebase@10.12.0/firebase-app-compat.js',
+  FIREBASE_DB:       'https://cdn.jsdelivr.net/npm/firebase@10.12.0/firebase-database-compat.js',
   CRYPTOJS:          'https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.min.js',
   CHARTJS:           'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js',
 };
@@ -2789,8 +2789,10 @@ function createTx(formData) {
   var fbKey = generateFbKey();
 
   var tx = {
-    id:      State.nextId('tx'),
-    _fbKey:  fbKey,
+    id:         State.nextId('tx'),
+    _fbKey:     fbKey,
+    _createdAt: Date.now(),
+    _updatedAt: Date.now(),
     date:    formData.date || nowStr(),
     dow:     getDow(formData.date || nowStr()),
     type:    formData.type || 'rolling',
@@ -2816,6 +2818,9 @@ function createTx(formData) {
 
   // 持久化
   Store.saveTxs(State.get('txs'));
+
+  // ★ 即時同步到 Firebase
+  syncTxToFirebase(tx);
 
   // 通知事件
   Events.emit(EVENTS.TX_CREATED, tx);
@@ -2859,6 +2864,7 @@ function updateTx(fbKey, formData) {
         arr[i].fund    = fund;
         arr[i].cash    = toNum(formData.cash) || 0;
         arr[i].note    = formData.note != null ? formData.note : arr[i].note;
+        arr[i]._updatedAt = Date.now();
 
         updated = arr[i];
         break;
@@ -2871,6 +2877,9 @@ function updateTx(fbKey, formData) {
 
   // 持久化
   Store.saveTxs(State.get('txs'));
+
+  // ★ 即時同步到 Firebase
+  syncTxToFirebase(updated);
 
   // 通知事件
   Events.emit(EVENTS.TX_UPDATED, updated);
@@ -2901,6 +2910,9 @@ function deleteTx(fbKey) {
 
   // 持久化
   Store.saveTxs(State.get('txs'));
+
+  // ★ 即時從 Firebase 刪除
+  removeTxFromFirebase(fbKey);
 
   // 通知事件
   Events.emit(EVENTS.TX_DELETED, deleted);
@@ -3140,7 +3152,9 @@ function recalcAllTxs() {
 function createFund(data) {
   var fbKey = generateFbKey();
   var record = {
-    _fbKey: fbKey,
+    _fbKey:     fbKey,
+    _createdAt: Date.now(),
+    _updatedAt: Date.now(),
     id:     State.nextId('fund'),
     date:   data.date || nowStr(),
     type:   data.type || 'deposit',
@@ -3154,6 +3168,7 @@ function createFund(data) {
   });
 
   Store.saveFund(State.get('fundWithdrawals'));
+  syncFundToFirebase(record);
   Events.emit(EVENTS.FUND_CREATED, record);
   return record;
 }
@@ -3173,6 +3188,7 @@ function updateFund(fbKey, data) {
         if (data.type != null)   arr[i].type = data.type;
         if (data.amount != null) arr[i].amount = toNum(data.amount);
         if (data.note != null)   arr[i].note = data.note;
+        arr[i]._updatedAt = Date.now();
         updated = arr[i];
         break;
       }
@@ -3182,6 +3198,7 @@ function updateFund(fbKey, data) {
 
   if (!updated) return null;
   Store.saveFund(State.get('fundWithdrawals'));
+  syncFundToFirebase(updated);
   Events.emit(EVENTS.FUND_UPDATED, updated);
   return updated;
 }
@@ -3206,6 +3223,7 @@ function deleteFund(fbKey) {
 
   if (!deleted) return null;
   Store.saveFund(State.get('fundWithdrawals'));
+  removeFundFromFirebase(fbKey);
   Events.emit(EVENTS.FUND_DELETED, deleted);
   return deleted;
 }
@@ -3254,7 +3272,9 @@ function getAllFunds() {
 function createWallet(agentName, data) {
   var fbKey = generateFbKey();
   var record = {
-    _fbKey: fbKey,
+    _fbKey:     fbKey,
+    _createdAt: Date.now(),
+    _updatedAt: Date.now(),
     id:     State.nextId('wallet'),
     date:   data.date || nowStr(),
     type:   data.type || 'deposit',
@@ -3269,6 +3289,7 @@ function createWallet(agentName, data) {
   });
 
   Store.saveWallets(State.get('agentWallets'));
+  syncWalletToFirebase(agentName, record);
   Events.emit(EVENTS.WALLET_CREATED, { agent: agentName, record: record });
   return record;
 }
@@ -3291,6 +3312,7 @@ function updateWallet(agentName, fbKey, data) {
         if (data.type != null)   records[i].type = data.type;
         if (data.amount != null) records[i].amount = toNum(data.amount);
         if (data.note != null)   records[i].note = data.note;
+        records[i]._updatedAt = Date.now();
         updated = records[i];
         break;
       }
@@ -3300,6 +3322,7 @@ function updateWallet(agentName, fbKey, data) {
 
   if (!updated) return null;
   Store.saveWallets(State.get('agentWallets'));
+  syncWalletToFirebase(agentName, updated);
   Events.emit(EVENTS.WALLET_UPDATED, { agent: agentName, record: updated });
   return updated;
 }
@@ -3331,6 +3354,7 @@ function deleteWallet(agentName, fbKey) {
 
   if (!deleted) return null;
   Store.saveWallets(State.get('agentWallets'));
+  removeWalletFromFirebase(agentName, fbKey);
   Events.emit(EVENTS.WALLET_DELETED, { agent: agentName, record: deleted });
   return deleted;
 }
@@ -3442,6 +3466,7 @@ function addAgent(name) {
   });
 
   Store.saveAgentList(State.get('agentList'));
+  syncAgentListToFirebase(State.get('agentList'));
   Events.emit(EVENTS.AGENT_LIST_UPDATED, State.get('agentList'));
   return { success: true, name: name };
 }
@@ -3467,6 +3492,7 @@ function removeAgent(name) {
   }
 
   Store.saveAgentList(State.get('agentList'));
+  syncAgentListToFirebase(State.get('agentList'));
   Events.emit(EVENTS.AGENT_LIST_UPDATED, State.get('agentList'));
   return { success: true, name: name };
 }
@@ -3519,6 +3545,8 @@ function renameAgent(oldName, newName) {
   Store.saveAgentList(State.get('agentList'));
   Store.saveTxs(State.get('txs'));
   Store.saveWallets(State.get('agentWallets'));
+
+  syncAgentListToFirebase(State.get('agentList'));
 
   Events.emit(EVENTS.AGENT_LIST_UPDATED, State.get('agentList'));
   Events.emit(EVENTS.TXS_LOADED, State.get('txs'));
@@ -3603,6 +3631,8 @@ function createBooking(data) {
   var booking = {
     id:            State.nextId('booking'),
     _fbKey:        fbKey,
+    _createdAt:    Date.now(),
+    _updatedAt:    Date.now(),
     date:          data.date || nowStr(),
     month:         normalizeMonth(data.checkIn),
     agent:         data.agent || '',
@@ -3627,6 +3657,7 @@ function createBooking(data) {
 
   Store.saveBookings(State.get('bookings'));
   Store.saveBookingLastId(booking.id);
+  syncBookingToFirebase(booking);
   Events.emit(EVENTS.BOOKING_CREATED, booking);
   return booking;
 }
@@ -3658,6 +3689,7 @@ function updateBooking(fbKey, data) {
         b.nights = calcNights(b.checkIn, b.checkOut);
         b.totalCost = b.nights * b.pricePerNight;
         b.month = normalizeMonth(b.checkIn);
+        b._updatedAt = Date.now();
         updated = b;
         break;
       }
@@ -3667,6 +3699,7 @@ function updateBooking(fbKey, data) {
 
   if (!updated) return null;
   Store.saveBookings(State.get('bookings'));
+  syncBookingToFirebase(updated);
   Events.emit(EVENTS.BOOKING_UPDATED, updated);
   return updated;
 }
@@ -3691,6 +3724,7 @@ function deleteBooking(fbKey) {
 
   if (!deleted) return null;
   Store.saveBookings(State.get('bookings'));
+  removeBookingFromFirebase(fbKey);
   Events.emit(EVENTS.BOOKING_DELETED, deleted);
   return deleted;
 }
@@ -4637,36 +4671,108 @@ function hasDraft() {
 // 初始化
 // ============================================================================
 
-var _db = null;  // Firebase database 实例
+var _db = null;              // Firebase database 实例
+var _fbRetryDone = false;    // 是否已完成重试/setup
+var _fbPollTimer = null;     // 轮询定时器
+var _initialSyncDone = false; // 首次连通后已完成双向同步
 
 /**
- * 初始化 Firebase
- * @returns {object} database 实例
+ * 真正执行 Firebase 初始化
+ * @returns {object|null}
  */
-function initFirebase() {
-  // 检测 Firebase SDK
-  if (typeof firebase === 'undefined') {
-    console.error('[v13:firebase] FATAL: Firebase SDK not loaded!');
-    Events.emit(EVENTS.SYNC_ERROR, 'Firebase SDK 未載入，請檢查 CDN 連線');
-    return null;
-  }
-
+function _doInitFirebase() {
+  if (typeof firebase === 'undefined') return null;
   try {
     if (!firebase.apps.length) {
       firebase.initializeApp(FIREBASE_CONFIG);
     }
     _db = firebase.database();
-    console.log('[v13:firebase] Initialized successfully');
-
-    // 启动连接监控
+    console.log('[v13:firebase] ✅ Connected! _db ready, database:', _db.ref.toString().substring(0,30));
     _watchConnection();
-
     return _db;
   } catch (e) {
     console.error('[v13:firebase] Init error:', e);
-    Events.emit(EVENTS.SYNC_ERROR, 'Firebase 初始化失敗: ' + e.message);
     return null;
   }
+}
+
+/**
+ * 初始化成功后补启动 watchers + 同步
+ */
+function _onFirebaseReady() {
+  console.log('[v13:firebase] 🚀 Starting watchers + sync...');
+  try { startWatchers(); } catch(e) { console.error('[v13:firebase] startWatchers error:', e); }
+  try { syncDownloadAll(); } catch(e) { console.error('[v13:firebase] syncDownloadAll error:', e); }
+}
+
+/**
+ * 初始化 Firebase（多层回退保障）
+ * 1. 立即尝试（如果 SDK 已加载）
+ * 2. load 事件重试（兼容 document.readyState===complete）
+ * 3. 1秒间隔轮询 最多 30 次
+ * @returns {object|null} database 实例，未就绪时返回 null
+ */
+function initFirebase() {
+  // 如果已经连上了，直接返回
+  if (_db) return _db;
+
+  // 立即尝试
+  var result = _doInitFirebase();
+  if (result) {
+    _fbRetryDone = true;
+    // ★ 首次成功也触发 onFirebaseReady（延迟，等连接真正建立后再同步）
+    // 但不在 initAppAfterLogin 之前启动 watchers，避免与后续 initAppAfterLogin 双重注册
+    // 标记需要延迟同步，由 _watchConnection 在连通时触发
+    return result;
+  }
+
+  // 还没连上 — 安排重试
+  if (_fbRetryDone) return null;  // 已经安排过了
+  _fbRetryDone = true;
+
+  console.warn('[v13:firebase] Firebase SDK not loaded yet, setting up retry...');
+
+  // 策略A: load 事件（处理 document.readyState 问题）
+  function tryInitViaEvent() {
+    if (!_db) {
+      console.log('[v13:firebase] ⏳ Retry via event...');
+      _doInitFirebase();
+      if (_db) _onFirebaseReady();
+    }
+  }
+
+  if (document.readyState === 'complete') {
+    // 页面已完全加载，直接用 setTimeout 延迟执行
+    console.log('[v13:firebase] Page already loaded, scheduling retry...');
+    setTimeout(tryInitViaEvent, 500);
+  } else {
+    window.addEventListener('load', tryInitViaEvent);
+  }
+
+  // 策略B: 轮询（兜底 — 处理 load 永远不触发的情况）
+  var pollCount = 0;
+  _fbPollTimer = setInterval(function() {
+    pollCount++;
+    if (typeof firebase !== 'undefined' && !_db) {
+      console.log('[v13:firebase] ⏳ Poll #' + pollCount + ' — Firebase SDK detected, initializing...');
+      _doInitFirebase();
+      if (_db) {
+        clearInterval(_fbPollTimer);
+        _fbPollTimer = null;
+        _onFirebaseReady();
+      }
+    }
+    if (pollCount >= 30) {
+      clearInterval(_fbPollTimer);
+      _fbPollTimer = null;
+      if (!_db) {
+        console.error('[v13:firebase] ❌ Firebase SDK failed to load after 30s. Sync disabled.');
+        console.error('[v13:firebase]    请检查: 1) 网络是否可访问 cdn.jsdelivr.net  2) 防火墙/广告拦截器是否屏蔽');
+      }
+    }
+  }, 1000);
+
+  return null;
 }
 
 /**
@@ -4697,19 +4803,30 @@ function _watchConnection() {
   var connectedRef = _db.ref(FB_PATH.CONNECTED);
   connectedRef.on('value', function(snap) {
     var connected = snap.val() === true;
+    var prevConnected = State.get('syncConnected');
     State.set('syncConnected', connected);
     Events.emit(EVENTS.CONNECTION_CHANGED, connected);
 
     if (connected) {
-      console.log('[v13:firebase] Connected to Firebase');
-      // 重连后 1.5 秒自动同步
+      console.log('[v13:firebase] ✅ Firebase RTDB 已連線');
+      // 首次连通：延迟 2 秒后执行双向同步（给 SDK 时间稳定连接）
       setTimeout(function() {
-        if (State.get('syncConnected')) {
-          syncUploadAll();
+        if (!State.get('syncConnected')) return;  // 又断开了，跳过
+        console.log('[v13:firebase] 🔄 执行双向同步...');
+        // 先上传本地数据
+        try { syncUploadAll(); } catch(e) { console.error('[v13:firebase] syncUploadAll error:', e); }
+        // 然后下载远端数据（如果还没做过首次同步）
+        if (!_initialSyncDone) {
+          _initialSyncDone = true;
+          console.log('[v13:firebase] 🔽 首次同步: 拉取遠端數據...');
+          try { syncDownloadAll(); } catch(e) { console.error('[v13:firebase] syncDownloadAll error:', e); }
         }
-      }, 1500);
+      }, 2000);
     } else {
-      console.warn('[v13:firebase] Disconnected from Firebase');
+      // 只有从 connected→disconnected 变化时才警告（避免首次 false 状态误报）
+      if (prevConnected === true) {
+        console.warn('[v13:firebase] ⚠️ Firebase RTDB 斷線');
+      }
     }
   });
 }
@@ -4723,9 +4840,19 @@ function _watchConnection() {
  * @param {object} tx
  */
 function syncTxToFirebase(tx) {
-  if (!_db || !tx._fbKey) return;
+  if (!_db || !tx._fbKey) {
+    if (!_db) console.warn('[v13:firebase] syncTx skipped: _db is null');
+    if (!tx._fbKey) console.warn('[v13:firebase] syncTx skipped: missing _fbKey');
+    return;
+  }
   try {
-    _db.ref(FB_PATH.TXS + '/' + tx._fbKey).set(tx);
+    _db.ref(FB_PATH.TXS + '/' + tx._fbKey).set(tx, function(err) {
+      if (err) {
+        console.error('[v13:firebase] syncTx FAILED:', err.message || err);
+        // 写入失败时重新入队
+        enqueueUpload(function() { syncTxToFirebase(tx); });
+      }
+    });
   } catch (e) {
     console.error('[v13:firebase] syncTx error:', e);
   }
@@ -4738,7 +4865,9 @@ function syncTxToFirebase(tx) {
 function removeTxFromFirebase(fbKey) {
   if (!_db) return;
   try {
-    _db.ref(FB_PATH.TXS + '/' + fbKey).set(null);
+    _db.ref(FB_PATH.TXS + '/' + fbKey).set(null, function(err) {
+      if (err) console.error('[v13:firebase] removeTx FAILED:', err.message || err);
+    });
   } catch (e) {
     console.error('[v13:firebase] removeTx error:', e);
   }
@@ -4749,9 +4878,17 @@ function removeTxFromFirebase(fbKey) {
  * @param {object} record
  */
 function syncFundToFirebase(record) {
-  if (!_db || !record._fbKey) return;
+  if (!_db || !record._fbKey) {
+    if (!_db) console.warn('[v13:firebase] syncFund skipped: _db is null');
+    return;
+  }
   try {
-    _db.ref(FB_PATH.FUND + '/' + record._fbKey).set(record);
+    _db.ref(FB_PATH.FUND + '/' + record._fbKey).set(record, function(err) {
+      if (err) {
+        console.error('[v13:firebase] syncFund FAILED:', err.message || err);
+        enqueueUpload(function() { syncFundToFirebase(record); });
+      }
+    });
   } catch (e) {
     console.error('[v13:firebase] syncFund error:', e);
   }
@@ -4764,7 +4901,9 @@ function syncFundToFirebase(record) {
 function removeFundFromFirebase(fbKey) {
   if (!_db) return;
   try {
-    _db.ref(FB_PATH.FUND + '/' + fbKey).set(null);
+    _db.ref(FB_PATH.FUND + '/' + fbKey).set(null, function(err) {
+      if (err) console.error('[v13:firebase] removeFund FAILED:', err.message || err);
+    });
   } catch (e) {
     console.error('[v13:firebase] removeFund error:', e);
   }
@@ -4776,9 +4915,17 @@ function removeFundFromFirebase(fbKey) {
  * @param {object} record
  */
 function syncWalletToFirebase(agent, record) {
-  if (!_db || !record._fbKey) return;
+  if (!_db || !record._fbKey) {
+    if (!_db) console.warn('[v13:firebase] syncWallet skipped: _db is null');
+    return;
+  }
   try {
-    _db.ref(FB_PATH.AGENT_WALLETS + '/' + encodeFirebaseKey(agent) + '/' + record._fbKey).set(record);
+    _db.ref(FB_PATH.AGENT_WALLETS + '/' + encodeFirebaseKey(agent) + '/' + record._fbKey).set(record, function(err) {
+      if (err) {
+        console.error('[v13:firebase] syncWallet FAILED:', err.message || err);
+        enqueueUpload(function() { syncWalletToFirebase(agent, record); });
+      }
+    });
   } catch (e) {
     console.error('[v13:firebase] syncWallet error:', e);
   }
@@ -4792,7 +4939,9 @@ function syncWalletToFirebase(agent, record) {
 function removeWalletFromFirebase(agent, fbKey) {
   if (!_db) return;
   try {
-    _db.ref(FB_PATH.AGENT_WALLETS + '/' + encodeFirebaseKey(agent) + '/' + fbKey).set(null);
+    _db.ref(FB_PATH.AGENT_WALLETS + '/' + encodeFirebaseKey(agent) + '/' + fbKey).set(null, function(err) {
+      if (err) console.error('[v13:firebase] removeWallet FAILED:', err.message || err);
+    });
   } catch (e) {
     console.error('[v13:firebase] removeWallet error:', e);
   }
@@ -4803,9 +4952,17 @@ function removeWalletFromFirebase(agent, fbKey) {
  * @param {object} booking
  */
 function syncBookingToFirebase(booking) {
-  if (!_db || !booking._fbKey) return;
+  if (!_db || !booking._fbKey) {
+    if (!_db) console.warn('[v13:firebase] syncBooking skipped: _db is null');
+    return;
+  }
   try {
-    _db.ref(FB_PATH.RM_BOOKINGS + '/' + booking._fbKey).set(booking);
+    _db.ref(FB_PATH.RM_BOOKINGS + '/' + booking._fbKey).set(booking, function(err) {
+      if (err) {
+        console.error('[v13:firebase] syncBooking FAILED:', err.message || err);
+        enqueueUpload(function() { syncBookingToFirebase(booking); });
+      }
+    });
   } catch (e) {
     console.error('[v13:firebase] syncBooking error:', e);
   }
@@ -4818,9 +4975,46 @@ function syncBookingToFirebase(booking) {
 function removeBookingFromFirebase(fbKey) {
   if (!_db) return;
   try {
-    _db.ref(FB_PATH.RM_BOOKINGS + '/' + fbKey).set(null);
+    _db.ref(FB_PATH.RM_BOOKINGS + '/' + fbKey).set(null, function(err) {
+      if (err) console.error('[v13:firebase] removeBooking FAILED:', err.message || err);
+    });
   } catch (e) {
     console.error('[v13:firebase] removeBooking error:', e);
+  }
+}
+
+/**
+ * 同步代理名单到 Firebase（用 transaction 原子合併，防止并发丢失）
+ * @param {Array} agentList - 當前本地代理名單
+ */
+function syncAgentListToFirebase(agentList) {
+  if (!_db) {
+    console.warn('[v13:firebase] syncAgentList skipped: _db is null');
+    return;
+  }
+  try {
+    _db.ref(FB_PATH.AGENT_LIST).transaction(function(remote) {
+      if (!remote || !Array.isArray(remote)) return agentList;
+      // 原子合併：本地 + 遠端（去重）
+      var merged = remote.slice();
+      for (var i = 0; i < agentList.length; i++) {
+        if (merged.indexOf(agentList[i]) === -1) {
+          merged.push(agentList[i]);
+        }
+      }
+      merged.sort(function(a, b) { return a.localeCompare(b); });
+      // 只有当真正有变化时才返回新值（返回 undefined 表示中止事务）
+      if (JSON.stringify(merged) === JSON.stringify(remote)) return;
+      return merged;
+    }, function(err, committed, snapshot) {
+      if (err) {
+        console.error('[v13:firebase] syncAgentList transaction FAILED:', err.message || err);
+        // 失败时重试（用 enqueueUpload 排队）
+        enqueueUpload(function() { syncAgentListToFirebase(agentList); });
+      }
+    });
+  } catch (e) {
+    console.error('[v13:firebase] syncAgentList error:', e);
   }
 }
 
@@ -4984,102 +5178,74 @@ function syncUploadAll() {
 
   var db = getDB();
 
-  // 1. 交易 (transaction: 本地优先，删除多余)
+  // 1. 交易：transaction 原子合併 (個別 CRUD 已即時推送，此為安全網)
   db.ref(FB_PATH.TXS).transaction(function(remote) {
     if (!remote) return fbArrayToObj(txs);
-    // 合并：本地更新覆盖远端
-    var merged = fbObjToArray(remote);
-    var localMap = {};
-    for (var i = 0; i < txs.length; i++) {
-      localMap[txs[i]._fbKey] = txs[i];
-    }
-    for (var j = 0; j < merged.length; j++) {
-      var key = merged[j]._fbKey;
-      if (localMap[key]) {
-        merged[j] = localMap[key];
-        delete localMap[key];
-      }
-    }
-    // 添加本地新增的
-    for (var k in localMap) {
-      merged.push(localMap[k]);
-    }
+    var rArr = fbObjToArray(remote);
+    var merged = mergeTxs(rArr, txs);
     return fbArrayToObj(merged);
   });
 
-  // 2. 公基金
+  // 2. 公基金：transaction 原子合併
   db.ref(FB_PATH.FUND).transaction(function(remote) {
     if (!remote) return fbArrayToObj(fundWithdrawals);
-    var merged = fbObjToArray(remote);
+    var rArr = fbObjToArray(remote);
     var localMap = {};
-    for (var i = 0; i < fundWithdrawals.length; i++) {
-      localMap[fundWithdrawals[i]._fbKey] = fundWithdrawals[i];
+    for (var fi = 0; fi < fundWithdrawals.length; fi++) {
+      localMap[fundWithdrawals[fi]._fbKey] = fundWithdrawals[fi];
     }
-    for (var j = 0; j < merged.length; j++) {
-      var key = merged[j]._fbKey;
-      if (localMap[key]) {
-        merged[j] = localMap[key];
-        delete localMap[key];
+    for (var fj = 0; fj < rArr.length; fj++) {
+      var fKey = rArr[fj]._fbKey;
+      if (!localMap[fKey]) {
+        localMap[fKey] = rArr[fj];
+      } else {
+        var lTs = localMap[fKey]._updatedAt || 0;
+        var rTs = rArr[fj]._updatedAt || 0;
+        if (rTs > lTs) localMap[fKey] = rArr[fj];
       }
     }
-    for (var k in localMap) {
-      merged.push(localMap[k]);
-    }
-    return fbArrayToObj(merged);
+    var mf = [];
+    for (var fk in localMap) mf.push(localMap[fk]);
+    return fbArrayToObj(mf);
   });
 
-  // 3. 代理名单 (直接 set 数组)
-  db.ref(FB_PATH.AGENT_LIST).set(agentList);
+  // 3. 代理名單：transaction 原子合併
+  db.ref(FB_PATH.AGENT_LIST).transaction(function(remote) {
+    if (!remote || !Array.isArray(remote)) return agentList;
+    return mergeAgentLists(agentList, remote);
+  });
 
-  // 4. 代理钱包
+  // 4. 代理钱包：transaction 原子合併
   db.ref(FB_PATH.AGENT_WALLETS).transaction(function(remote) {
     if (!remote) return fbWalletsToObj(agentWallets);
-    var remoteWallets = fbObjToWallets(remote);
-    // 合并
-    for (var agent in agentWallets) {
-      var localRecords = agentWallets[agent];
-      var remoteRecords = remoteWallets[agent] || [];
-      var localMap = {};
-      for (var i = 0; i < localRecords.length; i++) {
-        localMap[localRecords[i]._fbKey] = localRecords[i];
-      }
-      for (var j = 0; j < remoteRecords.length; j++) {
-        var key = remoteRecords[j]._fbKey;
-        if (localMap[key]) {
-          remoteRecords[j] = localMap[key];
-          delete localMap[key];
-        }
-      }
-      for (var k in localMap) {
-        remoteRecords.push(localMap[k]);
-      }
-      remoteWallets[agent] = remoteRecords;
-    }
-    return fbWalletsToObj(remoteWallets);
+    var rw = fbObjToWallets(remote);
+    return fbWalletsToObj(mergeWallets(rw, agentWallets));
   });
 
   // 5. 工作月份
   db.ref(FB_PATH.WORKING_MONTH).set(workingMonth);
 
-  // 6. 订房
+  // 6. 订房：transaction 原子合併
   db.ref(FB_PATH.RM_BOOKINGS).transaction(function(remote) {
     if (!remote) return fbArrayToObj(bookings);
-    var merged = fbObjToArray(remote);
+    var rArr = fbObjToArray(remote);
     var localMap = {};
-    for (var i = 0; i < bookings.length; i++) {
-      localMap[bookings[i]._fbKey] = bookings[i];
+    for (var bi = 0; bi < bookings.length; bi++) {
+      localMap[bookings[bi]._fbKey] = bookings[bi];
     }
-    for (var j = 0; j < merged.length; j++) {
-      var key = merged[j]._fbKey;
-      if (localMap[key]) {
-        merged[j] = localMap[key];
-        delete localMap[key];
+    for (var bj = 0; bj < rArr.length; bj++) {
+      var bKey = rArr[bj]._fbKey;
+      if (!localMap[bKey]) {
+        localMap[bKey] = rArr[bj];
+      } else {
+        var blTs = localMap[bKey]._updatedAt || 0;
+        var brTs = rArr[bj]._updatedAt || 0;
+        if (brTs > blTs) localMap[bKey] = rArr[bj];
       }
     }
-    for (var k in localMap) {
-      merged.push(localMap[k]);
-    }
-    return fbArrayToObj(merged);
+    var mb = [];
+    for (var bk in localMap) mb.push(localMap[bk]);
+    return fbArrayToObj(mb);
   });
 
   // 7. 月度存档
@@ -5143,34 +5309,13 @@ function startWatchers() {
   // 1. 监听交易
   _watchers.txs = db.ref(FB_PATH.TXS).on('value', function(snap) {
     var remote = fbObjToArray(snap.val());
-    if (remote.length === 0) return;
-
-    // 合并：保留本地独有的，更新远端有的
     var local = State.get('txs');
-    var localMap = {};
-    for (var i = 0; i < local.length; i++) {
-      localMap[local[i]._fbKey] = local[i];
-    }
 
-    var changed = false;
-    for (var j = 0; j < remote.length; j++) {
-      var rKey = remote[j]._fbKey;
-      if (!localMap[rKey]) {
-        // 远端新增 → 加入本地
-        local.push(remote[j]);
-        changed = true;
-      } else {
-        // 远端更新 → 覆盖本地（取时间戳大的）
-        // 简化处理：远端覆盖本地
-        localMap[rKey] = remote[j];
-        changed = true;
-      }
-    }
+    // 用 mergeTxs 合并（时间戳胜出策略）
+    var merged = mergeTxs(local, remote);
 
-    if (changed) {
-      // 重建数组
-      var merged = [];
-      for (var k in localMap) { merged.push(localMap[k]); }
+    // 检测是否真正有变化（按长度+内容）
+    if (JSON.stringify(merged) !== JSON.stringify(local)) {
       State.set('txs', merged);
       Store.saveTxs(merged);
       Events.emit(EVENTS.TXS_LOADED, merged);
@@ -5180,26 +5325,12 @@ function startWatchers() {
   // 2. 监听公基金
   _watchers.fund = db.ref(FB_PATH.FUND).on('value', function(snap) {
     var remote = fbObjToArray(snap.val());
-    if (remote.length === 0) return;
-
     var local = State.get('fundWithdrawals');
-    var localMap = {};
-    for (var i = 0; i < local.length; i++) {
-      localMap[local[i]._fbKey] = local[i];
-    }
 
-    var changed = false;
-    for (var j = 0; j < remote.length; j++) {
-      var fbKey = remote[j]._fbKey;
-      if (!localMap[fbKey] || JSON.stringify(localMap[fbKey]) !== JSON.stringify(remote[j])) {
-        localMap[fbKey] = remote[j];
-        changed = true;
-      }
-    }
+    // 用 mergeArrays 合并（本地有+远端没有 → 保留本地；远端有+本地没有 → 加入）
+    var merged = mergeArrays(local, remote);
 
-    if (changed) {
-      var merged = [];
-      for (var k in localMap) { merged.push(localMap[k]); }
+    if (JSON.stringify(merged) !== JSON.stringify(local)) {
       State.set('fundWithdrawals', merged);
       Store.saveFund(merged);
       Events.emit(EVENTS.FUND_LOADED, merged);
@@ -5212,10 +5343,11 @@ function startWatchers() {
     if (!remote || !Array.isArray(remote)) return;
 
     var local = State.get('agentList');
-    if (JSON.stringify(local) !== JSON.stringify(remote)) {
-      State.set('agentList', remote);
-      Store.saveAgentList(remote);
-      Events.emit(EVENTS.AGENT_LIST_UPDATED, remote);
+    var merged = mergeAgentLists(local, remote);
+    if (JSON.stringify(merged) !== JSON.stringify(local)) {
+      State.set('agentList', merged);
+      Store.saveAgentList(merged);
+      Events.emit(EVENTS.AGENT_LIST_UPDATED, merged);
     }
   });
 
@@ -5245,13 +5377,15 @@ function startWatchers() {
   // 6. 监听订房
   _watchers.bookings = db.ref(FB_PATH.RM_BOOKINGS).on('value', function(snap) {
     var remote = fbObjToArray(snap.val());
-    if (remote.length === 0) return;
-
     var local = State.get('bookings');
-    if (JSON.stringify(local) !== JSON.stringify(remote)) {
-      State.set('bookings', remote);
-      Store.saveBookings(remote);
-      Events.emit(EVENTS.BOOKINGS_LOADED, remote);
+
+    // 用 mergeArrays 合并，避免直接覆盖导致本地独有订房丢失
+    var merged = mergeArrays(local, remote);
+
+    if (JSON.stringify(merged) !== JSON.stringify(local)) {
+      State.set('bookings', merged);
+      Store.saveBookings(merged);
+      Events.emit(EVENTS.BOOKINGS_LOADED, merged);
     }
   });
 
@@ -5288,45 +5422,54 @@ function stopWatchers() {
 }
 
 /**
- * 手动全量同步 (从 Firebase 拉取)
+ * 手动全量同步 (从 Firebase 拉取，走 merge 逻辑避免覆盖本地数据)
  */
 function syncDownloadAll() {
   var db = getDB();
   if (!db) return;
 
   db.ref(FB_PATH.TXS).once('value', function(snap) {
-    var txs = fbObjToArray(snap.val());
-    if (txs.length > 0) {
-      State.set('txs', txs);
-      Store.saveTxs(txs);
-      Events.emit(EVENTS.TXS_LOADED, txs);
+    var remote = fbObjToArray(snap.val());
+    var local = State.get('txs');
+    var merged = mergeTxs(local, remote);
+    if (JSON.stringify(merged) !== JSON.stringify(local)) {
+      State.set('txs', merged);
+      Store.saveTxs(merged);
+      Events.emit(EVENTS.TXS_LOADED, merged);
     }
   });
 
   db.ref(FB_PATH.FUND).once('value', function(snap) {
-    var funds = fbObjToArray(snap.val());
-    if (funds.length > 0) {
-      State.set('fundWithdrawals', funds);
-      Store.saveFund(funds);
-      Events.emit(EVENTS.FUND_LOADED, funds);
+    var remote = fbObjToArray(snap.val());
+    var local = State.get('fundWithdrawals');
+    var merged = mergeArrays(local, remote);
+    if (JSON.stringify(merged) !== JSON.stringify(local)) {
+      State.set('fundWithdrawals', merged);
+      Store.saveFund(merged);
+      Events.emit(EVENTS.FUND_LOADED, merged);
     }
   });
 
   db.ref(FB_PATH.AGENT_LIST).once('value', function(snap) {
-    var list = snap.val();
-    if (list && Array.isArray(list)) {
-      State.set('agentList', list);
-      Store.saveAgentList(list);
-      Events.emit(EVENTS.AGENT_LIST_UPDATED, list);
+    var remote = snap.val();
+    if (!remote || !Array.isArray(remote)) return;
+    var local = State.get('agentList');
+    var merged = mergeAgentLists(local, remote);
+    if (JSON.stringify(merged) !== JSON.stringify(local)) {
+      State.set('agentList', merged);
+      Store.saveAgentList(merged);
+      Events.emit(EVENTS.AGENT_LIST_UPDATED, merged);
     }
   });
 
   db.ref(FB_PATH.AGENT_WALLETS).once('value', function(snap) {
-    var wallets = fbObjToWallets(snap.val());
-    if (Object.keys(wallets).length > 0) {
-      State.set('agentWallets', wallets);
-      Store.saveWallets(wallets);
-      Events.emit(EVENTS.WALLETS_LOADED, wallets);
+    var remote = fbObjToWallets(snap.val());
+    var local = State.get('agentWallets');
+    var merged = mergeWallets(local, remote);
+    if (JSON.stringify(merged) !== JSON.stringify(local)) {
+      State.set('agentWallets', merged);
+      Store.saveWallets(merged);
+      Events.emit(EVENTS.WALLETS_LOADED, merged);
     }
   });
 
@@ -5340,11 +5483,13 @@ function syncDownloadAll() {
   });
 
   db.ref(FB_PATH.RM_BOOKINGS).once('value', function(snap) {
-    var bookings = fbObjToArray(snap.val());
-    if (bookings.length > 0) {
-      State.set('bookings', bookings);
-      Store.saveBookings(bookings);
-      Events.emit(EVENTS.BOOKINGS_LOADED, bookings);
+    var remote = fbObjToArray(snap.val());
+    var local = State.get('bookings');
+    var merged = mergeArrays(local, remote);
+    if (JSON.stringify(merged) !== JSON.stringify(local)) {
+      State.set('bookings', merged);
+      Store.saveBookings(merged);
+      Events.emit(EVENTS.BOOKINGS_LOADED, merged);
     }
   });
 
@@ -5480,6 +5625,23 @@ function mergeArrays(local, remote) {
     result.push(map[k]);
   }
   return result;
+}
+
+/**
+ * 合并代理名單（純字符串數組，兩邊去重合併）
+ * @param {Array} local - 本地名單 ['代理A','代理B']
+ * @param {Array} remote - 遠端名單 ['代理B','代理C']
+ * @returns {Array} 合併結果 ['代理A','代理B','代理C']
+ */
+function mergeAgentLists(local, remote) {
+  var merged = remote.slice();
+  for (var i = 0; i < local.length; i++) {
+    if (merged.indexOf(local[i]) === -1) {
+      merged.push(local[i]);
+    }
+  }
+  merged.sort(function(a, b) { return a.localeCompare(b); });
+  return merged;
 }
 
 // src/ui/toast.js
@@ -9680,12 +9842,12 @@ Events.on(EVENTS.HC_CONFIG_UPDATED, function() {
     // 填充下拉
     try { _populateDropdowns(); } catch(e) { console.error('[v13:app] populateDropdowns error:', e); }
 
-    // 启动 Firebase 监听器 (非致命)
+    // 启动 Firebase 监听器 (非致命) — watchers 在连线建立后会自动拉取远端数据
     try { startWatchers(); } catch(e) { console.warn('[v13:app] startWatchers error:', e); }
 
-    // 手动同步一次 (非致命)
-    try { syncUploadAll(); } catch(e) { console.warn('[v13:app] syncUploadAll error:', e); }
+    // 尝試同步 — 如果连线已建立就立即同步，否则由 _watchConnection 在连通时补触发
     try { syncDownloadAll(); } catch(e) { console.warn('[v13:app] syncDownloadAll error:', e); }
+    try { syncUploadAll(); } catch(e) { console.warn('[v13:app] syncUploadAll error:', e); }
 
     // 渲染: 加 try-catch 确保一个页面失败不影响其他
     try { renderOverview(); } catch(e) { console.error('[v13:app] renderOverview error:', e); }
