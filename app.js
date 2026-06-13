@@ -5411,29 +5411,19 @@ function syncUploadAll() {
   // 5. 工作月份
   db.ref(FB_PATH.WORKING_MONTH).set(workingMonth);
 
-  // 6. 订房：transaction 原子合併
+  // 6. 订房：transaction 原子合併（★ 使用 mergeBookings 时间戳决胜策略）
   db.ref(FB_PATH.RM_BOOKINGS).transaction(function(remote) {
     if (!remote) return fbArrayToObj(bookings);
     var rArr = fbObjToArray(remote);
-    var localMap = {};
-    for (var bi = 0; bi < bookings.length; bi++) {
-      localMap[bookings[bi]._fbKey] = bookings[bi];
+    var merged = mergeBookings(bookings, rArr);
+    console.log('[v13:uploader] BOOKINGS transaction: local=' + bookings.length + ' remote=' + rArr.length + ' merged=' + merged.length);
+    return fbArrayToObj(merged);
+  }, function(err, committed, snapshot) {
+    if (err) {
+      console.error('[v13:uploader] BOOKINGS transaction FAILED:', err.message || err);
+    } else if (committed) {
+      console.log('[v13:uploader] ✅ BOOKINGS transaction committed');
     }
-    for (var bj = 0; bj < rArr.length; bj++) {
-      var bKey = rArr[bj]._fbKey;
-      if (!localMap[bKey]) {
-        localMap[bKey] = rArr[bj];
-      } else {
-        var blTs = localMap[bKey]._updatedAt || 0;
-        var brTs = rArr[bj]._updatedAt || 0;
-        if (brTs > blTs) localMap[bKey] = rArr[bj];
-      }
-    }
-    var mb = [];
-    for (var bk in localMap) {
-      if (!localMap[bk]._deleted) mb.push(localMap[bk]);
-    }  // ★ 墓碑过滤
-    return fbArrayToObj(mb);
   });
 
   // 7. 月度存档
@@ -5570,10 +5560,11 @@ function startWatchers() {
     var remote = fbObjToArray(snap.val());
     var local = State.get('bookings');
 
-    // 用 mergeArrays 合并，避免直接覆盖导致本地独有订房丢失
-    var merged = mergeArrays(local, remote);
+    // ★ 用 mergeBookings（时间戳决胜），确保编辑/删除能跨端同步
+    var merged = mergeBookings(local, remote);
 
     if (JSON.stringify(merged) !== JSON.stringify(local)) {
+      console.log('[v13:watchers] BOOKINGS CHANGED: ' + local.length + ' → ' + merged.length + ' entries');
       State.set('bookings', merged);
       Store.saveBookings(merged);
       Events.emit(EVENTS.BOOKINGS_LOADED, merged);
@@ -5676,7 +5667,8 @@ function syncDownloadAll() {
   db.ref(FB_PATH.RM_BOOKINGS).once('value', function(snap) {
     var remote = fbObjToArray(snap.val());
     var local = State.get('bookings');
-    var merged = mergeArrays(local, remote);
+    // ★ 用 mergeBookings（时间戳决胜），确保下载合并时编辑/删除能正确处理
+    var merged = mergeBookings(local, remote);
     if (JSON.stringify(merged) !== JSON.stringify(local)) {
       State.set('bookings', merged);
       Store.saveBookings(merged);
@@ -5826,6 +5818,48 @@ function mergeArrays(local, remote) {
     // ★ 墓碑过滤：排除 _deleted:true 的远端删除标记
     if (!map[k]._deleted) {
       result.push(map[k]);
+    }
+  }
+  return result;
+}
+
+/**
+ * 合并订房数组（时间戳决胜策略，与 mergeTxs 一致）
+ * @param {Array} local - 本地订房数组
+ * @param {Array} remote - 远端订房数组
+ * @returns {Array} 合并结果（已过滤墓碑）
+ */
+function mergeBookings(local, remote) {
+  var merged = {};
+
+  // 先收集本地
+  for (var i = 0; i < local.length; i++) {
+    var key = local[i]._fbKey;
+    if (key) merged[key] = local[i];
+  }
+  // 再合并远端（时间戳决胜）
+  for (var j = 0; j < remote.length; j++) {
+    var rKey = remote[j]._fbKey;
+    if (rKey) {
+      if (merged[rKey]) {
+        var localTs  = merged[rKey]._updatedAt || 0;
+        var remoteTs = remote[j]._updatedAt || 0;
+        if (remoteTs > localTs) {
+          // 远端更新（包括墓碑 _deleted:true）胜出
+          merged[rKey] = remote[j];
+        }
+      } else {
+        // 本地没有 → 远端胜出（包括新增和墓碑）
+        merged[rKey] = remote[j];
+      }
+    }
+  }
+
+  // 过滤墓碑，返回有效数据
+  var result = [];
+  for (var k in merged) {
+    if (!merged[k]._deleted) {
+      result.push(merged[k]);
     }
   }
   return result;
