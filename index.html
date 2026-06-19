@@ -11,7 +11,7 @@
   <!-- 版本快取清除 -->
   <script>
     (function() {
-      var APP_VERSION = '13.0.0.1781862034581';
+      var APP_VERSION = '13.0.0.1781883455578';
       var stored = localStorage.getItem('macau_app_version');
       var qs = location.search || '';
       if (stored && stored !== APP_VERSION && !sessionStorage.getItem('_v13_reloaded')) {
@@ -2075,21 +2075,103 @@ tr.row-withdraw td { background: rgba(248,81,73,0.03); }
 }
 
 /* ═══════════════════════════════════════════════════════
- * 徽章
+ * 通用表格增强 (斑马纹 / 悬停 / 冻结表头 / 金额右对齐)
  * ═══════════════════════════════════════════════════════ */
 
+/* 斑马纹 */
+.data-table tbody tr:nth-child(even) td {
+  background: rgba(255,255,255,0.01);
+}
+.data-table tbody tr:nth-child(odd) td {
+  background: transparent;
+}
+
+/* 悬停整行高亮 */
+.data-table tbody tr:hover td {
+  background: rgba(0,212,255,0.04) !important;
+  transition: background 0.15s ease;
+}
+
+/* 冻结表头 */
+.data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-elevated);
+}
+
+/* 金额右对齐 + 千分位 */
+.data-table .col-num,
+.data-table td.num-right {
+  text-align: right;
+  font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  font-variant-numeric: tabular-nums;
+  padding-right: 16px !important;
+}
+
+/* 表格单元格垂直居中 */
+.data-table th,
+.data-table td {
+  vertical-align: middle;
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 状态圆角 Badge (统一规范)
+ * ═══════════════════════════════════════════════════════ */
+
+/* 基础 Badge — 所有状态标签统一用这个 */
 .badge {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
-  border-radius: 10px;
+  justify-content: center;
+  padding: 3px 10px;
+  border-radius: 12px;
   font-size: 11px;
   font-weight: 500;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  line-height: 1.4;
 }
-.badge-cyan { background: rgba(0,212,255,0.1); color: var(--tech-cyan); }
-.badge-gold { background: rgba(201,168,76,0.1); color: var(--gold-soft); }
-.badge-green { background: rgba(45,212,160,0.1); color: var(--success); }
-.badge-red { background: rgba(248,81,73,0.1); color: var(--danger); }
+.badge-cyan   { background: rgba(0,212,255,0.1);  color: var(--tech-cyan);  border: 1px solid rgba(0,212,255,0.15); }
+.badge-gold   { background: rgba(201,168,76,0.1); color: var(--gold-soft);  border: 1px solid rgba(201,168,76,0.15); }
+.badge-green  { background: rgba(45,212,160,0.1);  color: var(--success);    border: 1px solid rgba(45,212,160,0.15); }
+.badge-red    { background: rgba(248,81,73,0.1);  color: var(--danger);     border: 1px solid rgba(248,81,73,0.15); }
+.badge-yellow { background: rgba(243,156,18,0.1);  color: var(--warning);    border: 1px solid rgba(243,156,18,0.15); }
+.badge-blue   { background: rgba(52,152,219,0.1);  color: var(--info);       border: 1px solid rgba(52,152,219,0.15); }
+.badge-violet { background: rgba(123,47,247,0.1);  color: var(--electric-violet); border: 1px solid rgba(123,47,247,0.15); }
+
+/* 交易类型标签 — 用 badge 样式覆盖 */
+.tx-type-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.tx-type-tag.roll { background: rgba(0,212,255,0.1); color: var(--tech-cyan); border: 1px solid rgba(0,212,255,0.15); }
+.tx-type-tag.cash { background: rgba(230,126,54,0.1); color: var(--cash-orange); border: 1px solid rgba(230,126,54,0.15); }
+
+/* 房务状态 Badge */
+.rm-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.rm-status-badge.checked-in  { background: rgba(45,212,160,0.1); color: var(--success); border: 1px solid rgba(45,212,160,0.15); }
+.rm-status-badge.checked-out { background: rgba(248,81,73,0.1); color: var(--danger);  border: 1px solid rgba(248,81,73,0.15); }
+.rm-status-badge.pending     { background: rgba(243,156,18,0.1); color: var(--warning); border: 1px solid rgba(243,156,18,0.15); }
 
 /* ── 日期下拉三联动 ── */
 .date-sel-wrap {
@@ -3300,7 +3382,7 @@ tr.rank-1 td {
   <!-- Firebase 初始化已统一由 src/sync/firebase.js 的 initFirebase() 处理（带重试） -->
 
   <!-- JS: 合并后由 build.js 输出为 app.js -->
-  <script src="app.js?v=13.0.0.1781862034581"></script>
+  <script src="app.js?v=13.0.0.1781883455578"></script>
 </head>
 <body>
 
@@ -3499,7 +3581,7 @@ tr.rank-1 td {
             <div class="empty-hint">點擊上方「新增交易」按鈕開始</div>
           </div>
           <div class="table-scroll">
-            <table id="all-table">
+            <table id="all-table" class="data-table">
               <thead>
                 <tr>
                   <th class="th-sortable" data-sort="type">類型</th>
@@ -3547,7 +3629,7 @@ tr.rank-1 td {
           </div>
           <div id="query-kpi" class="kpi-grid"></div>
           <div class="table-scroll">
-            <table id="query-table">
+            <table id="query-table" class="data-table">
               <thead id="query-thead"><tr>
                 <th class="th-sortable" data-sort="date">日期</th>
                 <th class="th-sortable" data-sort="agent">代理</th>
@@ -3746,11 +3828,11 @@ tr.rank-1 td {
         <div class="form-row"><label>代理</label><select name="agent" id="tx-agent" onchange="_onAgentChange()"><option value="">選擇代理</option></select></div>
         <div class="form-row"><label>客戶</label><input type="text" name="client" id="tx-client"></div>
         <div class="form-row"><label>地點</label><select name="venue" id="tx-venue"><option value="">選擇地點</option></select></div>
-        <div class="form-row"><label>洗碼量(萬)</label><input type="number" name="volume" id="tx-volume" step="0.01" oninput="calc()"></div>
-        <div class="form-row"><label>碼佣率(%)</label><input type="number" name="rate" id="tx-rate" step="0.01" oninput="calc()"></div>
+        <div class="form-row"><label>洗碼量(萬)</label><input type="number" name="volume" id="tx-volume" step="0.01" oninput="recalcComm()"></div>
+        <div class="form-row"><label>碼佣率(%)</label><input type="number" name="rate" id="tx-rate" step="0.01" oninput="recalcComm()"></div>
         <div class="form-row"><label>佣金</label><input type="number" name="comm" id="tx-comm" readonly></div>
-        <div class="form-row"><label>碼糧</label><input type="number" name="bonus" id="tx-bonus" oninput="calc()"></div>
-        <div class="form-row"><label>已提領</label><input type="number" name="drawn" id="tx-drawn" oninput="calc()"></div>
+        <div class="form-row"><label>碼糧</label><input type="number" name="bonus" id="tx-bonus" oninput="recalcComm()"></div>
+        <div class="form-row"><label>已提領</label><input type="number" name="drawn" id="tx-drawn" oninput="recalcComm()"></div>
         <div class="form-row"><label>未提領</label><input type="number" name="undrawn" id="tx-undrawn" readonly></div>
         <div class="form-row"><label>公基金</label><input type="number" name="fund" id="tx-fund" readonly></div>
         <div class="form-row"><label>現金寄放</label><input type="number" name="cash" id="tx-cash"></div>
@@ -3931,6 +4013,6 @@ tr.rank-1 td {
     <div id="v13-debug-log"></div>
   </div>
 
-  <!-- BUILD: v13.0.0 | 2026-06-11 | 2026-06-19T09:40:34.581Z -->
+  <!-- BUILD: v13.0.0 | 2026-06-11 | 2026-06-19T15:37:35.578Z -->
 </body>
 </html>

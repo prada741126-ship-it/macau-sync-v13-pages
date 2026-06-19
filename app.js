@@ -8697,10 +8697,15 @@ var RM = {
       tr._bId = b.id;
       tr.style.cursor = 'pointer';
 
+      // 状态栏用圆角 Badge
+      var statusBadge = h('span', {
+        class: 'rm-status-badge ' + (b.status === '免費' ? 'badge-green' : b.status === '付費' ? 'badge-red' : 'badge-yellow')
+      }, b.status);
+
       var cells = [
         b.date, b.agent, b.client, b.casino, b.hotel, b.roomType,
         b.checkIn, b.checkOut, b.nights, '¥' + fmt(b.pricePerNight),
-        '¥' + fmt(b.totalCost), b.status
+        '¥' + fmt(b.totalCost)
       ];
 
       for (var j = 0; j < cells.length; j++) {
@@ -8708,6 +8713,11 @@ var RM = {
         if (j >= 8 && j <= 10) tdAttrs.class = 'text-right num-mono';
         tr.appendChild(h('td', tdAttrs, String(cells[j])));
       }
+
+      // 状态栏 (Badge)
+      var tdStatus = h('td');
+      tdStatus.appendChild(statusBadge);
+      tr.appendChild(tdStatus);
 
       // 操作
       var tdBtn = h('td');
