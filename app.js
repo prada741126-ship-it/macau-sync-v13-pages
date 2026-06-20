@@ -8160,6 +8160,7 @@ function _renderAgentLedger(agent, filteredTxs, queryMonth) {
         client: txs[i].client || '',
         volume: toNum(txs[i].volume) || 0,
         bonus: bv,
+        drawn: txs[i].drawn || 0,
         rowType: 'rolling',
         type: '入帳',
         source: 'tx',
@@ -8295,26 +8296,27 @@ function _renderAgentLedger(agent, filteredTxs, queryMonth) {
   if (!tbody) return;
 
   if (thead) {
-    thead.innerHTML = '<tr><th>日期</th><th>地點/說明</th><th class="text-right num-mono">轉碼數</th><th class="text-right num-mono">碼糧</th><th>操作</th><th class="text-right num-mono">未領餘額</th></tr>';
+    thead.innerHTML = '<tr><th>日期</th><th>地點/說明</th><th class="text-right num-mono">轉碼數</th><th class="text-right num-mono">碼糧</th><th class="text-right num-mono">已提領</th><th>操作</th><th class="text-right num-mono">未領餘額</th></tr>';
   }
 
   tbody.innerHTML = '';
 
   // 标题行
   var titleRow = h('tr');
-  titleRow.innerHTML = '<td colspan="6" style="padding:8px 0;font-weight:700;color:' + UI_COLORS.goldSoft + ';font-size:14px;">💼 ' + agent + ' 代理對帳單</td>';
+  titleRow.innerHTML = '<td colspan="7" style="padding:8px 0;font-weight:700;color:' + UI_COLORS.goldSoft + ';font-size:14px;">💼 ' + agent + ' 代理對帳單</td>';
   tbody.appendChild(titleRow);
 
   // 上月累计行
   if (!skipMonthFilter && preRunning > 0) {
     var pr = h('tr');
     pr.style.cssText = 'background:' + hexToRgba(UI_COLORS.goldSoft, 0.08) + ';';
-    pr.innerHTML = '<td>' + filterStart.substring(0, 7) + '-01</td><td style="color:' + UI_COLORS.goldSoft + ';font-weight:600;">上月累計</td><td class="text-right num-mono"></td><td class="text-right num-mono"></td><td></td><td class="text-right num-mono" style="font-weight:700;color:' + UI_COLORS.goldSoft + ';">' + fmtMoney(preRunning) + '</td>';
+    pr.innerHTML = '<td>' + filterStart.substring(0, 7) + '-01</td><td style="color:' + UI_COLORS.goldSoft + ';font-weight:600;">上月累計</td><td class="text-right num-mono"></td><td class="text-right num-mono"></td><td class="text-right num-mono"></td><td></td><td class="text-right num-mono" style="font-weight:700;color:' + UI_COLORS.goldSoft + ';">' + fmtMoney(preRunning) + '</td>';
     tbody.appendChild(pr);
   }
 
   // 数据行
   var running = preRunning;
+  var totalDrawnShown = 0;
   for (var i = 0; i < allLedger.length; i++) {
     var e = allLedger[i];
 
@@ -8334,6 +8336,7 @@ function _renderAgentLedger(agent, filteredTxs, queryMonth) {
         '<td style="color:' + UI_COLORS.danger + ';font-weight:700;">提領' + (e.note ? '：' + e.note : '') + '</td>' +
         '<td class="text-right num-mono"></td>' +
         '<td class="text-right num-mono" style="color:' + UI_COLORS.danger + ';font-weight:700;">-' + fmtMoney(e.amount) + '</td>' +
+        '<td class="text-right num-mono"></td>' +
         '<td><button class="btn-red" onclick="deleteAgentWallet(\'' + agent.replace(/'/g, "\\'") + '\',\'' + val + '\')">刪除</button></td>' +
         '<td class="text-right num-mono" style="font-weight:700;">' + fmtMoney(Math.max(0, running)) + '</td>';
 
@@ -8343,6 +8346,7 @@ function _renderAgentLedger(agent, filteredTxs, queryMonth) {
         '<td style="color:' + UI_COLORS.info + ';font-weight:700;">存入' + (e.note ? '：' + e.note : '') + '</td>' +
         '<td class="text-right num-mono"></td>' +
         '<td class="text-right num-mono" style="color:' + UI_COLORS.info + ';font-weight:700;">+' + fmtMoney(e.amount) + '</td>' +
+        '<td class="text-right num-mono"></td>' +
         '<td><button class="btn-red" onclick="deleteAgentWallet(\'' + agent.replace(/'/g, "\\'") + '\',\'' + val + '\')">刪除</button></td>' +
         '<td class="text-right num-mono" style="font-weight:700;">' + fmtMoney(Math.max(0, running)) + '</td>';
 
@@ -8352,6 +8356,7 @@ function _renderAgentLedger(agent, filteredTxs, queryMonth) {
         '<td style="color:' + UI_COLORS.cashOrange + ';font-weight:700;">自存現金' + (e.note ? '：' + e.note : '') + '</td>' +
         '<td class="text-right num-mono"></td>' +
         '<td class="text-right num-mono" style="color:' + UI_COLORS.cashOrange + ';font-weight:700;">+' + fmtMoney(e.amount) + '</td>' +
+        '<td class="text-right num-mono"></td>' +
         '<td><button class="btn-red" onclick="deleteAgentWallet(\'' + agent.replace(/'/g, "\\'") + '\',\'' + val + '\')">刪除</button></td>' +
         '<td class="text-right num-mono" style="font-weight:700;">' + fmtMoney(Math.max(0, running)) + '</td>';
 
@@ -8360,15 +8365,19 @@ function _renderAgentLedger(agent, filteredTxs, queryMonth) {
         '<td style="color:' + UI_COLORS.cashOrange + ';font-weight:700;">現金寄放' + (e.client ? '：' + e.client : '') + '</td>' +
         '<td class="text-right num-mono"></td>' +
         '<td class="text-right num-mono" style="color:' + UI_COLORS.cashOrange + ';font-weight:700;">+' + fmtMoney(e.bonus) + '</td>' +
+        '<td class="text-right num-mono"></td>' +
         '<td><span style="color:' + UI_COLORS.textMuted + ';font-size:11px;">自動</span></td>' +
         '<td class="text-right num-mono" style="font-weight:700;">' + fmtMoney(Math.max(0, running)) + '</td>';
 
     } else {
       var volStr = e.volume > 0 ? fmt(e.volume) + '萬' : '';
+      var drawnStr = e.drawn > 0 ? fmtMoney(e.drawn) : '';
+      if (e.drawn > 0) totalDrawnShown += e.drawn;
       tr.innerHTML = '<td>' + e.date + '</td>' +
         '<td>' + (e.venue || '') + '(' + (e.client || '') + ')</td>' +
         '<td class="text-right num-mono">' + volStr + '</td>' +
         '<td class="text-right num-mono" style="color:' + UI_COLORS.goldSoft + ';">' + fmtMoney(e.bonus) + '</td>' +
+        '<td class="text-right num-mono" style="color:' + UI_COLORS.danger + ';">' + drawnStr + '</td>' +
         '<td><span style="color:' + UI_COLORS.textMuted + ';font-size:11px;">自動</span></td>' +
         '<td class="text-right num-mono" style="font-weight:700;">' + fmtMoney(Math.max(0, running)) + '</td>';
     }
@@ -8376,7 +8385,7 @@ function _renderAgentLedger(agent, filteredTxs, queryMonth) {
   }
 
   // 合计行
-  _appendTotalRow(tbody, running);
+  _appendTotalRow(tbody, running, totalDrawnShown);
 
   // 隐藏代理帐务汇总
   var summarySection = document.getElementById('query-agent-summary-section');
@@ -8387,10 +8396,16 @@ function _renderAgentLedger(agent, filteredTxs, queryMonth) {
 // 共用：合计行
 // ============================================================================
 
-function _appendTotalRow(tbody, running) {
+function _appendTotalRow(tbody, running, drawnTotal) {
   var tr = h('tr');
   tr.style.cssText = 'background:' + hexToRgba(UI_COLORS.bgElevated, 0.8) + ';font-weight:700;color:' + UI_COLORS.goldSoft + ';';
-  tr.innerHTML = '<td></td><td style="color:' + UI_COLORS.textPrimary + ';">合計</td><td class="text-right num-mono"></td><td class="text-right num-mono"></td><td></td><td class="text-right num-mono" style="font-size:15px;">' + fmtMoney(Math.max(0, running)) + '</td>';
+  if (drawnTotal !== undefined) {
+    // 代理對帳單模式：7列（含已提領）
+    tr.innerHTML = '<td></td><td style="color:' + UI_COLORS.textPrimary + ';">合計</td><td class="text-right num-mono"></td><td class="text-right num-mono"></td><td class="text-right num-mono" style="color:' + UI_COLORS.danger + ';">' + (drawnTotal > 0 ? fmtMoney(drawnTotal) : '') + '</td><td></td><td class="text-right num-mono" style="font-size:15px;">' + fmtMoney(Math.max(0, running)) + '</td>';
+  } else {
+    // 公基金模式：6列
+    tr.innerHTML = '<td></td><td style="color:' + UI_COLORS.textPrimary + ';">合計</td><td class="text-right num-mono"></td><td class="text-right num-mono"></td><td></td><td class="text-right num-mono" style="font-size:15px;">' + fmtMoney(Math.max(0, running)) + '</td>';
+  }
   tbody.appendChild(tr);
 }
 
