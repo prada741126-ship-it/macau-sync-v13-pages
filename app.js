@@ -7189,6 +7189,11 @@ var _allSortCol = 'date';   // 默认按日期排序
 var _allSortDir = 'desc';   // 默认最新在前
 var _allTableSortInited = false;
 
+// ★ 搜索和分页状态
+var _allSearchQuery = '';
+var _allCurrentPage = 1;
+var _allPageSize = 50;  // 每页显示笔数
+
 /** 初始化全部交易表排序表头点击 */
 function _initAllTableSort() {
   var ths = document.querySelectorAll('#all-table th.th-sortable');
@@ -7243,9 +7248,38 @@ function _sortTxs(txs, col, dir) {
   return sorted;
 }
 
+/** ★ 搜索过滤交易 */
+function _filterTxsBySearch(txs, query) {
+  if (!query) return txs;
+  var q = query.toLowerCase().trim();
+  var results = [];
+  for (var i = 0; i < txs.length; i++) {
+    var tx = txs[i];
+    if (!tx) continue;
+    // 搜索代理、客户、地点、备注
+    var agent = (tx.agent || '').toLowerCase();
+    var client = (tx.client || '').toLowerCase();
+    var venue = (tx.venue || '').toLowerCase();
+    var note = (tx.note || '').toLowerCase();
+    if (agent.indexOf(q) !== -1 || client.indexOf(q) !== -1 ||
+        venue.indexOf(q) !== -1 || note.indexOf(q) !== -1) {
+      results.push(tx);
+    }
+  }
+  return results;
+}
+
 function renderAll() {
   var txs = State.get('txs');
   var month = State.get('workingMonth');
+
+  // ★ 读取搜索框
+  var searchInput = document.getElementById('all-search');
+  var newQuery = searchInput ? searchInput.value : '';
+  if (newQuery !== _allSearchQuery) {
+    _allSearchQuery = newQuery;
+    _allCurrentPage = 1;  // 搜索改变时重置页码
+  }
 
   // ★ 首次初始化排序表头
   if (!_allTableSortInited) { _initAllTableSort(); _allTableSortInited = true; }
@@ -7256,6 +7290,9 @@ function renderAll() {
   } catch (e) {
     console.error('[v13:all] filterByMonth 崩溃:', e);
   }
+
+  // ★ 应用搜索过滤
+  txs = _filterTxsBySearch(txs, _allSearchQuery);
 
   // ★ 应用排序
   if (_allSortCol) {
@@ -7273,6 +7310,12 @@ function renderAll() {
   } catch (e) {
     console.error('[v13:all] _renderAllTable 崩溃:', e);
   }
+
+  try {
+    _renderAllPagination(txs);
+  } catch (e) {
+    console.error('[v13:all] _renderAllPagination 崩溃:', e);
+  }
 }
 
 function _renderAllKPI(txs) {
@@ -7288,8 +7331,8 @@ function _renderAllKPI(txs) {
 
   var items = [
     { label: '📊 ' + TERMS.volume, raw: _totalVol, cuOpts: { suffix: '萬' },       accent: 'cyan',  color: UI_COLORS.techCyan },
-    { label: '💰 ' + TERMS.comm,   raw: _totalComm,cuOpts: { prefix: '¥' },         accent: 'blue',  color: UI_COLORS.skyBlue },
-    { label: '🎁 ' + TERMS.bonus,  raw: _totalBonus,cuOpts: { prefix: '¥' },        accent: 'violet',color: UI_COLORS.electricViolet },
+    { label: '💰 ' + TERMS.comm,   raw: _totalComm, cuOpts: { prefix: '¥' },         accent: 'blue',  color: UI_COLORS.skyBlue },
+    { label: '🎁 ' + TERMS.bonus,  raw: _totalBonus, cuOpts: { prefix: '¥' },        accent: 'violet', color: UI_COLORS.electricViolet },
     { label: '🏦 ' + TERMS.fund,   raw: _totalFund, cuOpts: { prefix: '¥' },        accent: 'gold',  color: UI_COLORS.goldSoft },
   ];
 
@@ -7315,7 +7358,16 @@ function _renderAllTable(txs) {
   if (!tbody) return;
 
   var msg = $('#all-msg');
-  if (txs.length === 0) {
+  
+  // ★ 分页
+  var totalRows = txs.length;
+  var totalPages = Math.ceil(totalRows / _allPageSize) || 1;
+  if (_allCurrentPage > totalPages) _allCurrentPage = totalPages;
+  var startIdx = (_allCurrentPage - 1) * _allPageSize;
+  var endIdx = Math.min(startIdx + _allPageSize, totalRows);
+  var pageTxs = txs.slice(startIdx, endIdx);
+  
+  if (totalRows === 0) {
     tbody.innerHTML = '';
     if (msg) msg.style.display = 'block';
     return;
@@ -7323,9 +7375,9 @@ function _renderAllTable(txs) {
   if (msg) msg.style.display = 'none';
 
   tbody.innerHTML = '';
-  for (var i = 0; i < txs.length; i++) {
+  for (var i = 0; i < pageTxs.length; i++) {
     // ★ 防御：跳过 undefined 的墓碑条目
-    if (!txs[i]) continue;
+    if (!pageTxs[i]) continue;
     (function(tx) {
       var tr = h('tr', {
         'data-fbkey': tx._fbKey,
@@ -7395,8 +7447,74 @@ function _renderAllTable(txs) {
       tr.appendChild(tdBtn);
 
       tbody.appendChild(tr);
-    })(txs[i]);
+    })(pageTxs[i]);
   }
+}
+
+/** ★ 渲染分页控件 */
+function _renderAllPagination(txs) {
+  var container = document.getElementById('all-pagination');
+  if (!container) return;
+  
+  var totalRows = txs.length;
+  var totalPages = Math.ceil(totalRows / _allPageSize) || 1;
+  
+  if (totalRows === 0 || totalPages <= 1) {
+    container.innerHTML = '';
+    return;
+  }
+  
+  var startIdx = (_allCurrentPage - 1) * _allPageSize + 1;
+  var endIdx = Math.min(_allCurrentPage * _allPageSize, totalRows);
+  
+  var html = '<div class="pagination-bar">';
+  html += '<span class="page-info">第 ' + startIdx + '-' + endIdx + ' 筆，共 ' + totalRows + ' 筆</span>';
+  html += '<div class="page-btns">';
+  
+  // 上一页
+  if (_allCurrentPage > 1) {
+    html += '<button class="page-btn" onclick="_allGoToPage(' + (_allCurrentPage - 1) + ')">‹ 上一頁</button>';
+  }
+  
+  // 页码按钮 (显示最多 5 个页码)
+  var startPage = Math.max(1, _allCurrentPage - 2);
+  var endPage = Math.min(totalPages, startPage + 4);
+  if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+  
+  if (startPage > 1) {
+    html += '<button class="page-btn" onclick="_allGoToPage(1)">1</button>';
+    if (startPage > 2) html += '<span class="page-ellipsis">...</span>';
+  }
+  
+  for (var p = startPage; p <= endPage; p++) {
+    if (p === _allCurrentPage) {
+      html += '<button class="page-btn active">' + p + '</button>';
+    } else {
+      html += '<button class="page-btn" onclick="_allGoToPage(' + p + ')">' + p + '</button>';
+    }
+  }
+  
+  if (endPage < totalPages) {
+    if (endPage < totalPages - 1) html += '<span class="page-ellipsis">...</span>';
+    html += '<button class="page-btn" onclick="_allGoToPage(' + totalPages + ')">' + totalPages + '</button>';
+  }
+  
+  // 下一页
+  if (_allCurrentPage < totalPages) {
+    html += '<button class="page-btn" onclick="_allGoToPage(' + (_allCurrentPage + 1) + ')">下一頁 ›</button>';
+  }
+  
+  html += '</div></div>';
+  container.innerHTML = html;
+}
+
+/** ★ 跳转到指定页 */
+function _allGoToPage(page) {
+  _allCurrentPage = page;
+  renderAll();
+  // 滚动到表格顶部
+  var table = document.getElementById('all-table');
+  if (table) table.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // src/pages/query.js
