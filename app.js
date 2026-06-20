@@ -8732,6 +8732,19 @@ var RM = {
   },
 
   saveForm: function() {
+    // 字段级验证
+    if (typeof validateRoomForm === 'function') {
+      var result = validateRoomForm();
+      if (!result.valid) {
+        if (result.firstErrorId) {
+          var el = document.getElementById(result.firstErrorId);
+          if (el) el.focus();
+        }
+        if (typeof showToast === 'function') showToast('請修正表單錯誤', 'warning');
+        return;
+      }
+    }
+
     // 先合成日期值到 hidden input
     readDateSels('rm-checkin');
     readDateSels('rm-checkout');
@@ -10298,12 +10311,18 @@ function calc() {
 
 /** 保存交易表单 */
 function saveForm() {
-  var data = getCurrentFormData();
-
-  if (!data.agent) {
-    showToast('請選擇代理', 'warning');
+  // 字段级验证
+  var result = validateTxForm();
+  if (!result.valid) {
+    if (result.firstErrorId) {
+      var el = document.getElementById(result.firstErrorId);
+      if (el) el.focus();
+    }
+    showToast('請修正表單錯誤', 'warning');
     return;
   }
+
+  var data = getCurrentFormData();
 
   if (_txEditingKey) {
     // 编辑
@@ -10357,10 +10376,319 @@ function refreshAllViews() {
 }
 
 // ============================================================================
+// 表单验证辅助函数
+// ============================================================================
+
+/**
+ * 清除表单中所有字段错误状态
+ * @param {string} formContext - 表单上下文标识，如 'tx'、'fund'、'wallet'、'hc'、'rm'
+ */
+function clearFieldErrors(formContext) {
+  var prefixMap = {
+    'tx':    ['tx-type','tx-agent','tx-client','tx-venue','tx-volume','tx-rate','tx-bonus','tx-drawn','tx-cash','tx-note'],
+    'fund':  ['fund-date','fund-type','fund-amount','fund-note'],
+    'wallet':['wallet-agent','wallet-date','wallet-type','wallet-amount','wallet-note'],
+    'hc':   ['hc-casino','hc-hotel','hc-code','hc-room','hc-weekday','hc-weekend','hc-special','hc-threshold'],
+    'rm':   ['rm-agent','rm-client','rm-casino','rm-hotel','rm-room','rm-checkin','rm-checkout','rm-nights','rm-price','rm-total'],
+  };
+  var ids = prefixMap[formContext] || [];
+  for (var i = 0; i < ids.length; i++) {
+    var el = document.getElementById(ids[i]);
+    if (!el) continue;
+    // 移除字段错误样式
+    el.classList.remove('field-error');
+    var row = el.closest('.form-row');
+    if (row) row.classList.remove('has-error');
+    // 移除错误提示文字
+    var next = el.nextElementSibling;
+    if (next && next.classList && next.classList.contains('field-error-msg')) {
+      next.remove();
+    }
+    // 也检查 parentNode 内的 error msg
+    if (row) {
+      var existingMsg = row.querySelector('.field-error-msg');
+      if (existingMsg) existingMsg.remove();
+    }
+  }
+  // 清除表单级错误汇总
+  var summary = document.getElementById(formContext + '-error-summary');
+  if (summary) {
+    summary.textContent = '';
+    summary.classList.remove('visible');
+  }
+}
+
+/**
+ * 在字段下方显示错误提示
+ * @param {string} fieldId - 字段 DOM ID
+ * @param {string} message - 错误提示文字
+ */
+function showFieldError(fieldId, message) {
+  var el = document.getElementById(fieldId);
+  if (!el) return;
+  // 标记错误样式
+  el.classList.add('field-error');
+  var row = el.closest('.form-row');
+  if (row) row.classList.add('has-error');
+
+  // 避免重复添加错误提示
+  var existingMsg = row ? row.querySelector('.field-error-msg') : null;
+  if (existingMsg) {
+    existingMsg.textContent = message;
+    return;
+  }
+
+  // 创建错误提示元素
+  var msgEl = document.createElement('div');
+  msgEl.className = 'field-error-msg';
+  msgEl.textContent = message;
+  msgEl.style.cssText = 'font-size:11px;color:var(--danger);margin-top:3px;padding-left:2px;animation:errorFadeIn 0.2s ease';
+
+  if (row) {
+    row.appendChild(msgEl);
+  } else {
+    el.parentNode.insertBefore(msgEl, el.nextSibling);
+  }
+}
+
+/**
+ * 验证交易表单
+ * @returns {{ valid: boolean, firstErrorId: string|null }}
+ */
+function validateTxForm() {
+  clearFieldErrors('tx');
+  var data = getCurrentFormData();
+  var errors = [];
+  var firstErrorId = null;
+
+  // 代理必填
+  if (!data.agent) {
+    errors.push({ id: 'tx-agent', msg: '請選擇代理' });
+  }
+  // 客户必填
+  if (!data.client || !data.client.trim()) {
+    errors.push({ id: 'tx-client', msg: '請輸入客戶名稱' });
+  }
+  // 日期必填
+  if (!data.date) {
+    errors.push({ id: 'tx-date', msg: '請選擇日期' });
+  }
+  // 转码类型：洗码量必填且 > 0
+  if (data.type === 'rolling') {
+    var vol = toNum(data.volume);
+    if (!data.volume || vol <= 0) {
+      errors.push({ id: 'tx-volume', msg: '請輸入洗碼量（須大於0）' });
+    }
+    var rate = toNum(data.rate);
+    if (!data.rate || rate < 0) {
+      errors.push({ id: 'tx-rate', msg: '請輸入碼佣率' });
+    }
+  }
+  // 现金寄放类型：金额必填且 > 0
+  if (data.type === 'cash') {
+    var cash = toNum(data.cash);
+    if (!data.cash || cash <= 0) {
+      errors.push({ id: 'tx-cash', msg: '請輸入現金寄放金額（須大於0）' });
+    }
+  }
+
+  // 显示所有错误
+  for (var i = 0; i < errors.length; i++) {
+    showFieldError(errors[i].id, errors[i].msg);
+    if (i === 0) firstErrorId = errors[i].id;
+  }
+
+  return { valid: errors.length === 0, firstErrorId: firstErrorId };
+}
+
+/**
+ * 验证公基金表单
+ * @returns {{ valid: boolean, firstErrorId: string|null }}
+ */
+function validateFundForm() {
+  clearFieldErrors('fund');
+  var errors = [];
+  var firstErrorId = null;
+
+  var date = (document.getElementById('fund-date') || {}).value;
+  if (!date) {
+    errors.push({ id: 'fund-date', msg: '請選擇日期' });
+  }
+  var amount = toNum((document.getElementById('fund-amount') || {}).value);
+  if (!amount || amount <= 0) {
+    errors.push({ id: 'fund-amount', msg: '請輸入金額（須大於0）' });
+  }
+
+  for (var i = 0; i < errors.length; i++) {
+    showFieldError(errors[i].id, errors[i].msg);
+    if (i === 0) firstErrorId = errors[i].id;
+  }
+
+  return { valid: errors.length === 0, firstErrorId: firstErrorId };
+}
+
+/**
+ * 验证代理钱包表单
+ * @returns {{ valid: boolean, firstErrorId: string|null }}
+ */
+function validateWalletForm() {
+  clearFieldErrors('wallet');
+  var errors = [];
+  var firstErrorId = null;
+
+  var agent = ((document.getElementById('wallet-agent') || {}).value || _walletAgentName || '');
+  if (!agent) {
+    errors.push({ id: 'wallet-agent', msg: '請選擇代理' });
+  }
+  var amount = toNum((document.getElementById('wallet-amount') || {}).value);
+  if (!amount || amount <= 0) {
+    errors.push({ id: 'wallet-amount', msg: '請輸入金額（須大於0）' });
+  }
+
+  for (var i = 0; i < errors.length; i++) {
+    showFieldError(errors[i].id, errors[i].msg);
+    if (i === 0) firstErrorId = errors[i].id;
+  }
+
+  return { valid: errors.length === 0, firstErrorId: firstErrorId };
+}
+
+/**
+ * 验证酒店设定表单
+ * @returns {{ valid: boolean, firstErrorId: string|null }}
+ */
+function validateHcForm() {
+  clearFieldErrors('hc');
+  var errors = [];
+  var firstErrorId = null;
+
+  var casino = (document.getElementById('hc-casino') || {}).value;
+  if (!casino) {
+    errors.push({ id: 'hc-casino', msg: '請選擇體系' });
+  }
+  var hotel = (document.getElementById('hc-hotel') || {}).value;
+  if (!hotel) {
+    errors.push({ id: 'hc-hotel', msg: '請選擇酒店' });
+  }
+  var room = (document.getElementById('hc-room') || {}).value;
+  if (!room || !room.trim()) {
+    errors.push({ id: 'hc-room', msg: '請輸入房型名稱' });
+  }
+  var weekday = toNum((document.getElementById('hc-weekday') || {}).value);
+  if (weekday < 0) {
+    errors.push({ id: 'hc-weekday', msg: '平日價不能為負數' });
+  }
+  var weekend = toNum((document.getElementById('hc-weekend') || {}).value);
+  if (weekend < 0) {
+    errors.push({ id: 'hc-weekend', msg: '週末價不能為負數' });
+  }
+
+  for (var i = 0; i < errors.length; i++) {
+    showFieldError(errors[i].id, errors[i].msg);
+    if (i === 0) firstErrorId = errors[i].id;
+  }
+
+  return { valid: errors.length === 0, firstErrorId: firstErrorId };
+}
+
+/**
+ * 验证房务订房表单
+ * @returns {{ valid: boolean, firstErrorId: string|null }}
+ */
+function validateRoomForm() {
+  clearFieldErrors('rm');
+  var errors = [];
+  var firstErrorId = null;
+
+  var agent = (document.getElementById('rm-agent') || {}).value;
+  if (!agent) {
+    errors.push({ id: 'rm-agent', msg: '請選擇代理' });
+  }
+  var client = (document.getElementById('rm-client') || {}).value;
+  if (!client || !client.trim()) {
+    errors.push({ id: 'rm-client', msg: '請輸入客戶名稱' });
+  }
+  var casino = (document.getElementById('rm-casino') || {}).value;
+  if (!casino) {
+    errors.push({ id: 'rm-casino', msg: '請選擇體系' });
+  }
+  var hotel = (document.getElementById('rm-hotel') || {}).value;
+  if (!hotel) {
+    errors.push({ id: 'rm-hotel', msg: '請選擇酒店' });
+  }
+  var room = (document.getElementById('rm-room') || {}).value;
+  if (!room) {
+    errors.push({ id: 'rm-room', msg: '請選擇房型' });
+  }
+  var checkIn = (document.getElementById('rm-checkin') || {}).value;
+  if (!checkIn) {
+    errors.push({ id: 'rm-checkin', msg: '請選擇入住日期' });
+  }
+  var checkOut = (document.getElementById('rm-checkout') || {}).value;
+  if (!checkOut) {
+    errors.push({ id: 'rm-checkout', msg: '請選擇退房日期' });
+  }
+  if (checkIn && checkOut && checkOut <= checkIn) {
+    errors.push({ id: 'rm-checkout', msg: '退房日期必須晚於入住日期' });
+  }
+  var nights = toNum((document.getElementById('rm-nights') || {}).value);
+  if (!nights || nights <= 0) {
+    errors.push({ id: 'rm-nights', msg: '天數必須大於0' });
+  }
+  var total = toNum((document.getElementById('rm-total') || {}).value);
+  if (total < 0) {
+    errors.push({ id: 'rm-total', msg: '總費用不能為負數' });
+  }
+
+  for (var i = 0; i < errors.length; i++) {
+    showFieldError(errors[i].id, errors[i].msg);
+    if (i === 0) firstErrorId = errors[i].id;
+  }
+
+  return { valid: errors.length === 0, firstErrorId: firstErrorId };
+}
+
+/**
+ * 显示表单级错误汇总（可选，在多个错误时使用）
+ */
+function showFormErrorSummary(formContext, message) {
+  var summary = document.getElementById(formContext + '-error-summary');
+  if (!summary) {
+    // 动态创建
+    summary = document.createElement('div');
+    summary.id = formContext + '-error-summary';
+    summary.className = 'form-error-summary';
+    // 插入到 Modal 标题之后
+    var modal = document.querySelector('#modal .modal');
+    if (modal) {
+      var title = modal.querySelector('h3');
+      if (title && title.nextSibling) {
+        modal.insertBefore(summary, title.nextSibling);
+      }
+    }
+  }
+  if (summary) {
+    summary.textContent = message || '請修正以下錯誤';
+    summary.classList.add('visible');
+  }
+}
+
+// ============================================================================
 // 公基金表单桥接
 // ============================================================================
 
 function saveFundForm() {
+  // 字段级验证
+  var result = validateFundForm();
+  if (!result.valid) {
+    if (result.firstErrorId) {
+      var el = document.getElementById(result.firstErrorId);
+      if (el) el.focus();
+    }
+    showToast('請修正表單錯誤', 'warning');
+    return;
+  }
+
   // 确保日期下拉已同步
   readDateSels('fund-date');
   var data = {
@@ -10369,11 +10697,6 @@ function saveFundForm() {
     amount: (document.getElementById('fund-amount') || {}).value || '0',
     note:   (document.getElementById('fund-note') || {}).value || '',
   };
-
-  if (!data.amount || toNum(data.amount) <= 0) {
-    showToast('請輸入金額', 'warning');
-    return;
-  }
 
   var record = createFund(data);
   if (record) {
@@ -10459,12 +10782,19 @@ function openWalletModal(agentName) {
 }
 
 function saveAgentWalletForm() {
-  var agentSel = document.getElementById('wallet-agent');
-  var agent = (agentSel && agentSel.value) ? agentSel.value : _walletAgentName;
-  if (!agent) {
-    showToast('請選擇代理', 'warning');
+  // 字段级验证
+  var result = validateWalletForm();
+  if (!result.valid) {
+    if (result.firstErrorId) {
+      var el = document.getElementById(result.firstErrorId);
+      if (el) el.focus();
+    }
+    showToast('請修正表單錯誤', 'warning');
     return;
   }
+
+  var agentSel = document.getElementById('wallet-agent');
+  var agent = (agentSel && agentSel.value) ? agentSel.value : _walletAgentName;
 
   // 确保日期下拉已同步
   readDateSels('wallet-date');
@@ -10474,11 +10804,6 @@ function saveAgentWalletForm() {
     amount: (document.getElementById('wallet-amount') || {}).value || '0',
     note:   (document.getElementById('wallet-note') || {}).value || '',
   };
-
-  if (!data.amount || toNum(data.amount) <= 0) {
-    showToast('請輸入金額', 'warning');
-    return;
-  }
 
   var record = createWallet(agent, data);
   if (record) {
@@ -10530,6 +10855,17 @@ function hcCloseModal() {
 }
 
 function hcSaveModal() {
+  // 字段级验证
+  var result = validateHcForm();
+  if (!result.valid) {
+    if (result.firstErrorId) {
+      var el = document.getElementById(result.firstErrorId);
+      if (el) el.focus();
+    }
+    showToast('請修正表單錯誤', 'warning');
+    return;
+  }
+
   var data = {
     casino:    (document.getElementById('hc-casino') || {}).value || '',
     hotel:     (document.getElementById('hc-hotel') || {}).value || '',
@@ -10540,11 +10876,6 @@ function hcSaveModal() {
     special:   (document.getElementById('hc-special') || {}).value || '0',
     threshold: (document.getElementById('hc-threshold') || {}).value || '0',
   };
-
-  if (!data.casino || !data.hotel || !data.room) {
-    showToast('請填寫體系、酒店、房型', 'warning');
-    return;
-  }
 
   if (_hcEditingKey) {
     var updated = updateHC(_hcEditingKey, data);

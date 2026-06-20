@@ -11,7 +11,7 @@
   <!-- 版本快取清除 -->
   <script>
     (function() {
-      var APP_VERSION = '13.0.0.1781937317466';
+      var APP_VERSION = '13.0.0.1781937988767';
       var stored = localStorage.getItem('macau_app_version');
       var qs = location.search || '';
       if (stored && stored !== APP_VERSION && !sessionStorage.getItem('_v13_reloaded')) {
@@ -2566,6 +2566,59 @@ input[type="range"]:focus {
   padding: 0 4px;
 }
 
+/* ════════════════════════════════════════════════════
+ * 表单验证反馈样式
+ * ════════════════════════════════════════════════════ */
+
+/* 字段错误状态 — 红色边框 + 浅红背景 */
+.form-row.has-error input,
+.form-row.has-error select,
+.form-row.has-error textarea {
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 2px rgba(248,81,73,0.2) !important;
+  background: rgba(248,81,73,0.04) !important;
+}
+
+/* 错误提示文字 */
+.field-error-msg {
+  display: block;
+  font-size: 11px;
+  color: var(--danger);
+  margin-top: 3px;
+  padding-left: 2px;
+  line-height: 1.4;
+  animation: errorFadeIn 0.2s ease;
+}
+
+@keyframes errorFadeIn {
+  from { opacity: 0; transform: translateY(-3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* 字段成功状态 — 绿色边框（可选，用于实时验证通过） */
+.form-row.has-success input,
+.form-row.has-success select,
+.form-row.has-success textarea {
+  border-color: var(--success) !important;
+  box-shadow: 0 0 0 2px rgba(45,212,160,0.15) !important;
+}
+
+/* 表单级错误汇总 */
+.form-error-summary {
+  background: rgba(248,81,73,0.06);
+  border: 1px solid rgba(248,81,73,0.2);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--danger);
+  display: none;
+}
+.form-error-summary.visible {
+  display: block;
+  animation: errorFadeIn 0.2s ease;
+}
+
 /* css/china-theme.css */
 /* ============================================================================
  * v13 中国风主题 (隐性克制·30%)
@@ -3387,6 +3440,325 @@ tr.rank-1 td {
   }
 }
 
+/* css/print.css */
+/* ============================================================================
+ * v13 打印样式表 (@media print)
+ * 隐藏非必要元素，优化表格/KPI卡片的纸张输出
+ * ============================================================================ */
+
+@media print {
+
+  /* ---- 全局重置 ---- */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    box-shadow: none !important;
+  }
+
+  body {
+    background: #fff !important;
+    color: #000 !important;
+    font-size: 11pt;
+    line-height: 1.4;
+  }
+
+  /* ---- 隐藏非打印元素 ---- */
+  #sidebar,
+  #sidebar-overlay,
+  .mobile-bottom-nav,
+  #topbar,
+  #topbar-actions,
+  #page-progress-bar,
+  #loading-overlay,
+  #pw-overlay,
+  #toast-container,
+  #back-to-top,
+  #version-badge,
+  #v13-boot-diag,
+  #v13-debug-panel,
+  .month-bar,
+  .toolbar,
+  .quick-actions,
+  .sb-toggle,
+  .sb-version,
+  .sb-month,
+  .pagination-bar,
+  .search-box,
+  .search-clear,
+  .empty-state,
+  .page-msg,
+  .rm-dashboard,
+  .room-tabs,
+  .hc-filter-bar,
+  .hc-batch-bar,
+  .sb-divider,
+  .sb-item[onclick],
+  .decorative-line,
+  #g-confirm-bg,
+  .modal-bg,
+  #rm-modal-bg,
+  #hc-modal-bg {
+    display: none !important;
+  }
+
+  /* ---- 主布局调整 ---- */
+  #app-shell {
+    display: block !important;
+  }
+
+  #main-content {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  #page-scroll {
+    padding: 12pt !important;
+    overflow: visible !important;
+  }
+
+  .page {
+    display: none !important;
+  }
+
+  .page.active {
+    display: block !important;
+    position: static !important;
+    opacity: 1 !important;
+    transform: none !important;
+    padding: 0 !important;
+  }
+
+  /* ---- 打印页眉 ---- */
+  .page.active::before {
+    content: '澳門洗碼報表 v13.0.0 — ' attr(id);
+    display: block;
+    font-size: 14pt;
+    font-weight: bold;
+    margin-bottom: 8pt;
+    padding-bottom: 6pt;
+    border-bottom: 1.5pt solid #000;
+    color: #000;
+  }
+
+  #page-overview::before { content: '澳門洗碼報表 v13.0.0 — 總覽'; }
+  #page-all::before      { content: '澳門洗碼報表 v13.0.0 — 全部交易'; }
+  #page-query::before    { content: '澳門洗碼報表 v13.0.0 — 查詢結果'; }
+  #page-summary::before  { content: '澳門洗碼報表 v13.0.0 — 統計報表'; }
+  #page-room::before     { content: '澳門洗碼報表 v13.0.0 — 房務系統'; }
+  #page-wallet::before   { content: '澳門洗碼報表 v13.0.0 — 總錢包'; }
+
+  /* ---- KPI 卡片 ---- */
+  .kpi-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(140pt, 1fr)) !important;
+    gap: 8pt !important;
+    margin-bottom: 12pt !important;
+  }
+
+  .kpi-card {
+    background: #f9f9f9 !important;
+    border: 1pt solid #ccc !important;
+    border-radius: 0 !important;
+    padding: 8pt 10pt !important;
+    page-break-inside: avoid !important;
+  }
+
+  .kpi-card .kpi-label {
+    color: #555 !important;
+    font-size: 9pt !important;
+  }
+
+  .kpi-card .kpi-value {
+    color: #000 !important;
+    font-size: 14pt !important;
+  }
+
+  .kpi-card .kpi-sub {
+    color: #777 !important;
+    font-size: 8pt !important;
+  }
+
+  /* ---- 表格 ---- */
+  .table-scroll {
+    overflow: visible !important;
+    max-height: none !important;
+    border: 1pt solid #999 !important;
+  }
+
+  table,
+  .data-table,
+  .room-table,
+  .hc-table,
+  .agent-summary-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 9pt !important;
+    page-break-inside: auto !important;
+  }
+
+  th {
+    background: #eee !important;
+    color: #000 !important;
+    font-weight: bold !important;
+    font-size: 8pt !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+    padding: 5pt 6pt !important;
+    border-bottom: 1.5pt solid #000 !important;
+    position: static !important;
+  }
+
+  td {
+    padding: 4pt 6pt !important;
+    border-bottom: 0.5pt solid #ccc !important;
+    color: #000 !important;
+    white-space: normal !important;
+    word-break: break-all !important;
+  }
+
+  tr:nth-child(even) td {
+    background: #f5f5f5 !important;
+  }
+
+  tr:hover td {
+    background: inherit !important;
+  }
+
+  /* 表格分页控制 */
+  tr {
+    page-break-inside: avoid !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  /* ---- 图表容器：打印时显示替代文字 ---- */
+  .chart-container {
+    display: none !important;
+  }
+
+  .chart-container::after {
+    content: '[圖表已省略 — 請參閱螢幕版]';
+    display: block;
+    font-size: 9pt;
+    color: #999;
+    font-style: italic;
+    padding: 10pt;
+    border: 0.5pt dashed #ccc;
+    margin-bottom: 10pt;
+  }
+
+  /* ---- 房务系统专用 ---- */
+  .rm-stat-card {
+    background: #f9f9f9 !important;
+    border: 1pt solid #ccc !important;
+    padding: 6pt 8pt !important;
+    margin-bottom: 6pt;
+    page-break-inside: avoid !important;
+  }
+
+  .rm-stat-label {
+    color: #555 !important;
+    font-size: 8pt !important;
+  }
+
+  .rm-stat-value {
+    color: #000 !important;
+    font-size: 12pt !important;
+  }
+
+  .rm-quota-bar-wrap,
+  .rm-quota-bar {
+    display: none !important;
+  }
+
+  /* ---- 钱包页专用 ---- */
+  .wallet-section {
+    page-break-inside: avoid !important;
+    margin-bottom: 12pt !important;
+  }
+
+  .wallet-section-title {
+    color: #000 !important;
+    font-size: 12pt !important;
+    border-bottom: 1pt solid #000 !important;
+    padding-bottom: 4pt !important;
+    margin-bottom: 6pt !important;
+  }
+
+  .wallet-overview {
+    background: #f9f9f9 !important;
+    border: 1pt solid #ccc !important;
+    padding: 8pt !important;
+    margin-bottom: 10pt !important;
+  }
+
+  /* ---- 链接打印显示URL ---- */
+  a[href]::after {
+    content: ' (' attr(href) ')';
+    font-size: 8pt;
+    color: #555;
+  }
+
+  /* ---- 分页控制 ---- */
+  @page {
+    margin: 1.5cm 1cm;
+    size: A4;
+  }
+
+  /* 每页开头留白 */
+  .page-break-before {
+    page-break-before: always !important;
+  }
+
+  .page-break-avoid {
+    page-break-inside: avoid !important;
+  }
+
+  /* ---- 摘要/统计页表格标题 ---- */
+  #summary-table th,
+  .agent-summary-table th {
+    background: #ddd !important;
+  }
+
+  /* ---- 操作按钮列：打印时隐藏 ---- */
+  th:last-child,
+  td:last-child {
+    display: none !important;
+  }
+
+  /* 但"操作"列的上一列（备注）保留 */
+  th:nth-last-child(2),
+  td:nth-last-child(2) {
+    display: table-cell !important;
+  }
+
+  /* ---- 房务状态标签 ---- */
+  .rm-status,
+  .rm-status-confirmed,
+  .rm-status-pending,
+  .rm-status-cancelled {
+    border: 0.5pt solid #999 !important;
+    background: #f0f0f0 !important;
+    color: #000 !important;
+    padding: 1pt 4pt !important;
+    font-size: 8pt !important;
+  }
+
+  /* ---- 打印脚注 ---- */
+  #print-footer {
+    display: block !important;
+    text-align: right;
+    font-size: 8pt;
+    color: #999;
+    margin-top: 10pt;
+    border-top: 0.5pt solid #ccc;
+    padding-top: 4pt;
+  }
+}
+
 
 </style>
 
@@ -3447,7 +3819,7 @@ tr.rank-1 td {
   <!-- Firebase 初始化已统一由 src/sync/firebase.js 的 initFirebase() 处理（带重试） -->
 
   <!-- JS: 合并后由 build.js 输出为 app.js -->
-  <script src="app.js?v=13.0.0.1781937317466"></script>
+  <script src="app.js?v=13.0.0.1781937988767"></script>
 </head>
 <body>
 
@@ -3868,6 +4240,9 @@ tr.rank-1 td {
           </div>
         </div>
 
+        <!-- 打印页脚 (仅打印时显示) -->
+        <div id="print-footer" style="display:none"></div>
+
       </div><!-- /page-scroll -->
 
     </div><!-- /main-content -->
@@ -4079,6 +4454,33 @@ tr.rank-1 td {
     <div id="v13-debug-log"></div>
   </div>
 
-  <!-- BUILD: v13.0.0 | 2026-06-11 | 2026-06-20T06:35:17.467Z -->
+  <!-- 打印前注入时间 -->
+  <script>
+    (function() {
+      function pad(n) { return n < 10 ? '0' + n : '' + n; }
+      function setPrintTime() {
+        var el = document.getElementById('print-footer');
+        if (!el) return;
+        var now = new Date();
+        var str = now.getFullYear() + '-' + pad(now.getMonth()+1) + '-' + pad(now.getDate()) +
+                  ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes());
+        el.textContent = '列印時間: ' + str + '　｜　澳門洗碼報表 v13.0.0';
+      }
+      // 现代浏览器
+      window.addEventListener('beforeprint', setPrintTime);
+      // 兼容 WebKit (Chrome/Safari)
+      if (typeof window.onbeforeprint === 'object') {
+        window.onbeforeprint = setPrintTime;
+      }
+      // 兜底：页面加载时也设置一次
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setPrintTime);
+      } else {
+        setPrintTime();
+      }
+    })();
+  </script>
+
+  <!-- BUILD: v13.0.0 | 2026-06-11 | 2026-06-20T06:46:28.767Z -->
 </body>
 </html>
