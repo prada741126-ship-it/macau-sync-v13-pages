@@ -8317,6 +8317,8 @@ function _renderAgentLedger(agent, filteredTxs, queryMonth) {
   // 数据行
   var running = preRunning;
   var totalDrawnShown = 0;
+  var totalVolShown = 0;
+  var totalBonusShown = 0;
   for (var i = 0; i < allLedger.length; i++) {
     var e = allLedger[i];
 
@@ -8373,6 +8375,8 @@ function _renderAgentLedger(agent, filteredTxs, queryMonth) {
       var volStr = e.volume > 0 ? fmt(e.volume) + '萬' : '';
       var drawnStr = e.drawn > 0 ? fmtMoney(e.drawn) : '';
       if (e.drawn > 0) totalDrawnShown += e.drawn;
+      if (e.volume > 0) totalVolShown += e.volume;
+      totalBonusShown += e.bonus;
       tr.innerHTML = '<td>' + e.date + '</td>' +
         '<td>' + (e.venue || '') + '(' + (e.client || '') + ')</td>' +
         '<td class="text-right num-mono">' + volStr + '</td>' +
@@ -8384,8 +8388,9 @@ function _renderAgentLedger(agent, filteredTxs, queryMonth) {
     tbody.appendChild(tr);
   }
 
-  // 合计行
-  _appendTotalRow(tbody, running, totalDrawnShown);
+  // 合计行：未领余额 = 碼糧合计 - 已撿领合计（不含上月累计的rolling）
+  var undrawnTotal = Math.max(0, totalBonusShown - totalDrawnShown);
+  _appendTotalRow(tbody, running, totalDrawnShown, totalVolShown, totalBonusShown, undrawnTotal);
 
   // 隐藏代理帐务汇总
   var summarySection = document.getElementById('query-agent-summary-section');
@@ -8396,12 +8401,24 @@ function _renderAgentLedger(agent, filteredTxs, queryMonth) {
 // 共用：合计行
 // ============================================================================
 
-function _appendTotalRow(tbody, running, drawnTotal) {
+function _appendTotalRow(tbody, running, drawnTotal, volTotal, bonusTotal, undrawnTotal) {
   var tr = h('tr');
-  tr.style.cssText = 'background:' + hexToRgba(UI_COLORS.bgElevated, 0.8) + ';font-weight:700;color:' + UI_COLORS.goldSoft + ';';
+  tr.style.cssText = 'background:' + hexToRgba(UI_COLORS.bgElevated, 0.8) + ';font-weight:700;color:' + UI_COLORS.goldSoft + ';border-top:2px solid ' + UI_COLORS.borderSubtle + ';';
   if (drawnTotal !== undefined) {
-    // 代理對帳單模式：7列（含已提領）
-    tr.innerHTML = '<td></td><td style="color:' + UI_COLORS.textPrimary + ';">合計</td><td class="text-right num-mono"></td><td class="text-right num-mono"></td><td class="text-right num-mono" style="color:' + UI_COLORS.danger + ';">' + (drawnTotal > 0 ? fmtMoney(drawnTotal) : '') + '</td><td></td><td class="text-right num-mono" style="font-size:15px;">' + fmtMoney(Math.max(0, running)) + '</td>';
+    // 代理對帳單模式：7列（含总洗码数、碼糧合计、已提领、未领余额）
+    var volStr   = (volTotal   > 0) ? fmt(volTotal)   + '萬' : '';
+    var bonusStr = (bonusTotal > 0) ? fmtMoney(bonusTotal) : '';
+    var drawnStr = (drawnTotal > 0) ? fmtMoney(drawnTotal) : '';
+    // 未领余额优先使用传入的精确值，退而使用 running
+    var undrawnVal = (undrawnTotal !== undefined) ? undrawnTotal : Math.max(0, running);
+    tr.innerHTML =
+      '<td></td>' +
+      '<td style="color:' + UI_COLORS.textPrimary + ';">合計</td>' +
+      '<td class="text-right num-mono">' + volStr + '</td>' +
+      '<td class="text-right num-mono" style="color:' + UI_COLORS.goldSoft + ';">' + bonusStr + '</td>' +
+      '<td class="text-right num-mono" style="color:' + UI_COLORS.danger + ';">' + drawnStr + '</td>' +
+      '<td></td>' +
+      '<td class="text-right num-mono" style="font-size:15px;color:' + UI_COLORS.warning + ';">' + fmtMoney(undrawnVal) + '</td>';
   } else {
     // 公基金模式：6列
     tr.innerHTML = '<td></td><td style="color:' + UI_COLORS.textPrimary + ';">合計</td><td class="text-right num-mono"></td><td class="text-right num-mono"></td><td></td><td class="text-right num-mono" style="font-size:15px;">' + fmtMoney(Math.max(0, running)) + '</td>';
