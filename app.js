@@ -8388,9 +8388,9 @@ function _renderAgentLedger(agent, filteredTxs, queryMonth) {
     tbody.appendChild(tr);
   }
 
-  // 合计行：未领余额 = 碼糧合计 - 已撿领合计（不含上月累计的rolling）
-  var undrawnTotal = Math.max(0, totalBonusShown - totalDrawnShown);
-  _appendTotalRow(tbody, running, totalDrawnShown, totalVolShown, totalBonusShown, undrawnTotal);
+  // 合计行：碼糧合计含全部来源（交易碼糧+錢包存入），未领余额与 KPI awBalance 保持一致
+  var allIncome = allBonus + allCash + awDep + awCDep;
+  _appendTotalRow(tbody, running, allDrawn, totalVolShown, allIncome, awBalance);
 
   // 隐藏代理帐务汇总
   var summarySection = document.getElementById('query-agent-summary-section');
