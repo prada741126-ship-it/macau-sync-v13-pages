@@ -17,7 +17,7 @@
 // 系统识别
 // ============================================================================
 var APP = {
-  VERSION:       'v13.0.2',
+  VERSION:       'v13.0.3',
   TITLE:         '澳門洗碼報表',
   SYSTEM_NAME:   '博盈國際會',
   SYSTEM_SUB:    '洗碼管理系統',
@@ -10222,7 +10222,26 @@ function _openTxModal(fbKey) {
     if (draftEl) draftEl.style.display = 'none';
   }
 
+  // ★ 双保险：JS addEventListener + HTML oninput，确保 auto-calc 永远触发
+  _bindTxFormCalcListeners();
+
   openModal('modal');
+}
+
+/** 双保险绑定 calc 到表单字段 (oninput + onchange) */
+var _txFormCalcBound = false;
+function _bindTxFormCalcListeners() {
+  if (_txFormCalcBound) return;
+  var fields = ['tx-volume', 'tx-rate', 'tx-bonus', 'tx-drawn'];
+  for (var i = 0; i < fields.length; i++) {
+    var el = document.getElementById(fields[i]);
+    if (el) {
+      el.addEventListener('input', calc);
+      el.addEventListener('change', calc);
+    }
+  }
+  _txFormCalcBound = true;
+  console.log('[bridge] _bindTxFormCalcListeners: bound input+change on ' + fields.join(', '));
 }
 
 /** 填充交易表单代理下拉 */
