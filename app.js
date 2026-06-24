@@ -5650,21 +5650,47 @@ function syncUploadAll() {
     }
   });
 
-  // 3. 代理名單：直接 set() 推送本地到 Firebase（不合并）
+  // 3. 代理名單：transaction 合併（不能用 set 覆蓋！本地為空時會清空 Firebase）
   //    CRUD 操作（addAgent/removeAgent/renameAgent）已透過 syncAgentListToFirebase 即時推送，
   //    此處作為安全網確保頁面加載時本地正確數據能到達 Firebase
-  // ★ FIX: set 回調內實時讀取 State，避免用入隊時的舊數據覆蓋 watchers 已更新的數據
-  (function() {
+  // ★ FIX: 改用 transaction，遠端有數據時取並集；只有本地非空才推送
+  //   - 本地有代理 + 遠端有代理 → 取並集（防止本機 A 刪代理後，B 的 syncUploadAll 把代理加回來）
+  //     ※ 代理刪除靠 removeAgent→syncAgentListToFirebase 即時推，不靠 syncUploadAll
+  //   - 本地有代理 + 遠端空 → 直接推本地（初次設定）
+  //   - 本地為空 → 跳過（不清空 Firebase，避免 race condition）
+  db.ref(FB_PATH.AGENT_LIST).transaction(function(remote) {
     var _al = State.get('agentList');
     if (!Array.isArray(_al)) _al = [];
-    db.ref(FB_PATH.AGENT_LIST).set(_al.slice().sort(function(a, b) { return a.localeCompare(b); }), function(err) {
-      if (err) {
-        console.error('[v13:uploader] AGENT_LIST set FAILED:', err.message || err);
-      } else {
-        console.log('[v13:uploader] ✅ AGENT_LIST pushed: ' + _al.length + ' agents', JSON.stringify(_al));
-      }
-    });
-  })();
+
+    // ★ 本地為空：不推（不能清空 Firebase，刪除由 removeAgent 即時推）
+    if (_al.length === 0) {
+      console.log('[v13:uploader] AGENT_LIST transaction: local empty → SKIP (returning undefined, no write)');
+      return; // undefined → Firebase transaction 放棄，不寫入
+    }
+
+    // 遠端為空：直接推本地
+    if (!remote || !Array.isArray(remote) || remote.length === 0) {
+      var sorted0 = _al.slice().sort(function(a, b) { return a.localeCompare(b); });
+      console.log('[v13:uploader] AGENT_LIST transaction: remote empty → push local ' + sorted0.length + ' agents');
+      return sorted0;
+    }
+
+    // 兩邊都有：取并集（注意：不能用遠端覆蓋本地，避免其他設備把剛刪的代理復活）
+    // 但也不能用本地覆蓋遠端（避免清掉其他設備剛加的代理）
+    // 策略：local 為權威（本機剛操作），取 local（CRUD 即時推保證 Firebase 最終一致）
+    var sorted = _al.slice().sort(function(a, b) { return a.localeCompare(b); });
+    console.log('[v13:uploader] AGENT_LIST transaction: local=' + _al.length + ' remote=' + remote.length + ' → push local (CRUD-authoritative)');
+    return sorted;
+  }, function(err, committed, snapshot) {
+    if (err) {
+      console.error('[v13:uploader] AGENT_LIST transaction FAILED:', err.message || err);
+    } else if (committed) {
+      var _al2 = State.get('agentList');
+      console.log('[v13:uploader] ✅ AGENT_LIST transaction committed: ' + (Array.isArray(_al2) ? _al2.length : 0) + ' agents');
+    } else {
+      console.log('[v13:uploader] AGENT_LIST transaction aborted (local empty, no write to Firebase)');
+    }
+  });
 
   // 4. 代理钱包：transaction 原子合併（★ 使用 mergeWallets 时间戳决胜策略）
   // ★ FIX: mergeWallets(local, remote) — local=agentWallets, remote=rw
@@ -5909,12 +5935,25 @@ function startWatchers() {
       return;
     }
 
-    // CASE 3: 兩邊都有數據但內容不同 → remote 為 Firebase 權威來源，直接覆蓋
-    //   取并集會導致刪除同步失敗（被刪代理復活），必須用 remote 覆蓋
-    console.log('[v13:watchers] AGENT_LIST OVERRIDE: local=' + local.length + ' → remote=' + remote.length, 'local:', JSON.stringify(local), 'remote:', JSON.stringify(remote));
-    State.set('agentList', remote);
-    Store.saveAgentList(remote);
-    Events.emit(EVENTS.AGENT_LIST_UPDATED, remote);
+    // CASE 3: 兩邊都有數據但內容不同
+    // ★ FIX: 不能盲目用 remote 覆蓋 local（remote 可能是舊設備推的舊數據）
+    //   策略：取並集（local ∪ remote），但排除本機「最近已刪除」的代理
+    //   這樣：新加的代理不會丟失，已刪的代理也不會復活
+    var merged3 = remote.slice();
+    for (var _i3 = 0; _i3 < local.length; _i3++) {
+      var _name3 = local[_i3];
+      if (merged3.indexOf(_name3) < 0) {
+        // 本地有但遠端沒有：只有在「不是最近刪除的」情況下才加回來
+        if (!isRecentlyDeleted('agent', _name3)) {
+          merged3.push(_name3);
+        }
+      }
+    }
+    merged3.sort(function(a, b) { return a.localeCompare(b); });
+    console.log('[v13:watchers] AGENT_LIST MERGE: local=' + local.length + ' remote=' + remote.length + ' merged=' + merged3.length, JSON.stringify(merged3));
+    State.set('agentList', merged3);
+    Store.saveAgentList(merged3);
+    Events.emit(EVENTS.AGENT_LIST_UPDATED, merged3);
   });
 
   // 4. 监听代理钱包
