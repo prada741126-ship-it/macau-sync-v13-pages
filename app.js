@@ -5841,6 +5841,9 @@ function startWatchers() {
 
   // 3. 代理名單：智能監聽（區分刪除同步和新增同步）★ FIX: Push-only 無法跨設備同步刪除
   var _agentListReceivedFirst = false;
+  // ★ FIX: 記錄上一次遠端的「非空快照」時間，防止 Firebase 重連 race 誤清代理
+  var _agentListLastNonEmptyRemote = null;
+  var _agentListLastNonEmptyTime = 0;
   _watchers.agentList = db.ref(FB_PATH.AGENT_LIST).on('value', function(snap) {
     var remote = snap.val() || [];
     var local = State.get('agentList');
@@ -5859,7 +5862,18 @@ function startWatchers() {
         Store.saveAgentList(remote);
         Events.emit(EVENTS.AGENT_LIST_UPDATED, remote);
       }
+      // 記錄首次非空快照
+      if (remote.length > 0) {
+        _agentListLastNonEmptyRemote = remote.slice();
+        _agentListLastNonEmptyTime = Date.now();
+      }
       return;
+    }
+
+    // 更新非空快照記錄
+    if (remote.length > 0) {
+      _agentListLastNonEmptyRemote = remote.slice();
+      _agentListLastNonEmptyTime = Date.now();
     }
 
     // 檢測是否真正有變化
@@ -5868,11 +5882,21 @@ function startWatchers() {
     if (localSorted === remoteSorted) return;  // 無變化，跳過
 
     // CASE 1: 遠程為空（其他設備刪除了代理）→ 同步刪除
+    // ★ FIX: 加入安全保護：
+    //   (a) 距離上次看到非空遠端快照必須 < 10 秒（太久前可能是重連/race，不能清）
+    //   (b) 此前必須見過非空遠端快照（說明 Firebase 真的有數據，不是從未推送過）
     if (remote.length === 0 && local.length > 0) {
-      console.log('[v13:watchers] AGENT_LIST DELETE sync: remote empty, clearing local ' + local.length + ' agents');
-      State.set('agentList', []);
-      Store.saveAgentList([]);
-      Events.emit(EVENTS.AGENT_LIST_UPDATED, []);
+      var timeSinceNonEmpty = Date.now() - _agentListLastNonEmptyTime;
+      var hadNonEmptyRemote = _agentListLastNonEmptyTime > 0;
+      // ★ 只有在「剛剛（10秒內）還看過非空快照」的情況下，才認可這是刪除同步
+      if (hadNonEmptyRemote && timeSinceNonEmpty < 10000) {
+        console.log('[v13:watchers] AGENT_LIST DELETE sync: remote empty (confirmed, ' + timeSinceNonEmpty + 'ms after last non-empty), clearing local ' + local.length + ' agents');
+        State.set('agentList', []);
+        Store.saveAgentList([]);
+        Events.emit(EVENTS.AGENT_LIST_UPDATED, []);
+      } else {
+        console.warn('[v13:watchers] AGENT_LIST remote empty IGNORED (possible race/reconnect): local=' + local.length + ' hadNonEmpty=' + hadNonEmptyRemote + ' timeSince=' + timeSinceNonEmpty + 'ms → keeping local');
+      }
       return;
     }
 
@@ -6043,12 +6067,11 @@ function syncDownloadAll() {
     var remoteSorted = remote.slice().sort().join(',');
     if (localSorted === remoteSorted) return;
 
-    // CASE: 遠程為空（其他設備刪除了所有代理）→ 同步刪除（與 watchers CASE 1 一致）
+    // CASE: 遠程為空 → ★ FIX: syncDownloadAll 是手動觸發（Ctrl+S），不做「清空」危險操作
+    //   原因：手動同步時 Firebase 不一定已完成寫入（可能本機剛推送，自己又馬上拉），
+    //   誤清代理的後果比「不同步刪除」更嚴重。刪除同步依賴 watcher 實時監聽。
     if (local.length > 0 && remote.length === 0) {
-      console.log('[v13:watchers] syncDownloadAll AGENT_LIST DELETE sync: remote empty, clearing local ' + local.length + ' agents');
-      State.set('agentList', []);
-      Store.saveAgentList([]);
-      Events.emit(EVENTS.AGENT_LIST_UPDATED, []);
+      console.warn('[v13:watchers] syncDownloadAll AGENT_LIST remote empty SKIPPED (will not clear local ' + local.length + ' agents via manual sync — rely on watcher for delete sync)');
       return;
     }
 
@@ -10299,7 +10322,9 @@ function toggleTypeFields() {
   }
 }
 
-/** 自动计算佣金/基金/未提领 */
+/** 自动计算佣金/基金/未提领 (alias: recalcComm — template.html 的 oninput 绑定) */
+function recalcComm() { calc(); }
+
 function calc() {
   try {
     var volEl   = document.getElementById('tx-volume');
