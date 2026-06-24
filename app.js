@@ -94,6 +94,7 @@ var FB_PATH = {
   RM_BOOKINGS:     'macau_data/rmBookings',
   HC_CONFIG:       'macau_data/hcConfig',
   ARCHIVES:        'macau_data/archives',
+  CLEARED_AT:      'macau_data/_clearedAt',
   CONNECTED:       '.info/connected',
 };
 
@@ -5517,12 +5518,30 @@ function clearFirebaseData(onDone) {
     if (onDone) onDone(new Error('Firebase 未連線'));
     return;
   }
-  console.warn('[v13:firebase] 🗑️  clearFirebaseData: nuking macau_data/...');
-  db.ref('macau_data').set(null, function(err) {
+  console.warn('[v13:firebase] 🗑️  clearFirebaseData: clearing macau_data/ (with _clearedAt marker)...');
+
+  // ★ FIX: 不能直接用 set(null) 清空父节点
+  //   set(null) 会让手机端 watcher 收到 snap.val()=null → fbObjToArray=[] → mergeTxs 保留本地数据不删
+  //   解决方案：写入 _clearedAt 标记 + 逐个清空子路径，手机端 watcher 监听 _clearedAt 执行同步清除
+  var clearedAt = Date.now();
+  // 路径必须与 watchers.js 中 db.ref(FB_PATH.XXX) 一致
+  var clearPayload = {
+    '_clearedAt':           clearedAt,
+    'txs':                  null,
+    'fundWithdrawals':      null,
+    'agentWallets':         null,
+    'rmBookings':           null,
+    'agentList':            null,
+    'workingMonth':         null,
+    'hcConfig':             null,
+    'archives':             null,
+  };
+
+  db.ref('macau_data').update(clearPayload, function(err) {
     if (err) {
       console.error('[v13:firebase] ❌ clearFirebaseData FAILED:', err.message || err);
     } else {
-      console.log('[v13:firebase] ✅ clearFirebaseData OK — macau_data/ cleared');
+      console.log('[v13:firebase] ✅ clearFirebaseData OK — macau_data cleared (clearedAt=' + clearedAt + ')');
     }
     if (onDone) onDone(err);
   });
@@ -6038,7 +6057,63 @@ function startWatchers() {
     }
   });
 
-  console.log('[v13:watchers] All 8 watchers started (agent list: smart sync)');
+  // 9. 监听 _clearedAt — 跨设备「全部清除」同步
+  //    当电脑端执行全部清除时，手机端通过此监听器同步清空本地数据
+  var _lastClearedAt = 0;  // 已处理过的 _clearedAt 值，防止重复清除
+  _watchers.cleared_at = db.ref(FB_PATH.CLEARED_AT).on('value', function(snap) {
+    var clearedAt = snap.val();
+    if (!clearedAt) {
+      // _clearedAt 被清掉 = 正常状态（非清除模式），重置追踪值
+      if (_lastClearedAt > 0) {
+        console.log('[v13:watchers] CLEARED_AT removed (reset tracker)');
+        _lastClearedAt = 0;
+      }
+      return;
+    }
+
+    // 转换为数字比较
+    clearedAt = Number(clearedAt);
+
+    // 首次触发：只记录值，不执行清除（避免初始化时误清）
+    if (_lastClearedAt === 0) {
+      _lastClearedAt = clearedAt;
+      console.log('[v13:watchers] CLEARED_AT first seen: ' + clearedAt + ' (skip — init)');
+      return;
+    }
+
+    // 如果值没变，跳过
+    if (clearedAt <= _lastClearedAt) return;
+
+    // 新清除事件：_clearedAt 更新了 → 清空本地所有业务数据
+    console.warn('[v13:watchers] 🗑️  CLEARED_AT changed: ' + _lastClearedAt + ' → ' + clearedAt + ' — clearing local data!');
+    _lastClearedAt = clearedAt;
+
+    // 清空 State 中的业务数据
+    State.batchSet({
+      txs:             [],
+      fundWithdrawals: [],
+      agentWallets:    {},
+      agentList:       [],
+      bookings:        [],
+      backupList:      [],
+    }, 'clearedAt:sync');
+
+    // 清空 localStorage 中的业务数据
+    try { Store.clearLocalData(); } catch(e) {
+      console.error('[v13:watchers] clearLocalData error:', e);
+    }
+
+    // 触发 UI 刷新事件
+    Events.emit(EVENTS.TXS_LOADED, []);
+    Events.emit(EVENTS.FUND_LOADED, []);
+    Events.emit(EVENTS.WALLETS_LOADED, {});
+    Events.emit(EVENTS.AGENT_LIST_UPDATED, []);
+    Events.emit(EVENTS.BOOKINGS_LOADED, []);
+
+    showToast('偵測到電腦端已清除全部數據，手機端已同步清除', 'info');
+  });
+
+  console.log('[v13:watchers] All 9 watchers started (agent list: smart sync, clear sync: enabled)');
   return true;
 }
 
