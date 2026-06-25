@@ -11,7 +11,7 @@
   <!-- 版本快取清除 -->
   <script>
     (function() {
-      var APP_VERSION = '13.0.3.1782380612804';
+      var APP_VERSION = '13.0.3.1782382947297';
       var stored = localStorage.getItem('macau_app_version');
       var qs = location.search || '';
       if (stored && stored !== APP_VERSION && !sessionStorage.getItem('_v13_reloaded')) {
@@ -2802,13 +2802,13 @@ input[type="range"]:focus {
 
 /* css/china-theme.css */
 /* ============================================================================
- * v13 科技主题 — 整洁前卫·专业克制
+ * v13 科技主题 v2 — 可见·凌厉·专业
  *
- * 原则: 纯功能装饰、冷色系、无冗余宫廷元素
+ * 原则: 冷色主导、金色仅限功能标识（余额/金额）、装饰元素可感知
  * ============================================================================ */
 
 /* ═══════════════════════════════════════════════════════
- * 数据终端网格背景 (#15)
+ * 数据终端网格背景 — 可见点阵纹理
  * ═══════════════════════════════════════════════════════ */
 
 #page-scroll::before {
@@ -2817,11 +2817,11 @@ input[type="range"]:focus {
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.018;
+  opacity: 0.055;
   background-image:
-    radial-gradient(circle 1px at 0 0, var(--tech-cyan), transparent),
-    radial-gradient(circle 1px at 20px 20px, var(--tech-cyan), transparent);
-  background-size: 40px 40px;
+    radial-gradient(circle 1.5px at 0 0, var(--tech-cyan), transparent),
+    radial-gradient(circle 1.5px at 18px 18px, var(--tech-cyan), transparent);
+  background-size: 36px 36px;
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -2860,10 +2860,11 @@ tr.rank-1 td {
 }
 
 /* ═══════════════════════════════════════════════════════
- * 装饰性分割线 (克制版)
+ * 装饰性分割线 — 白色克制
  * ═══════════════════════════════════════════════════════ */
 
-.decorative-line {
+.decorative-line,
+.sb-divider {
   background: linear-gradient(90deg,
     transparent 0%,
     rgba(255,255,255,0.04) 30%,
@@ -2874,18 +2875,18 @@ tr.rank-1 td {
 }
 
 /* ═══════════════════════════════════════════════════════
- * KPI / Dash 卡片悬浮 — 科技冷光替代金边
+ * KPI / Dash 卡片悬浮 — 清晰青色边框
  * ═══════════════════════════════════════════════════════ */
 
 .kpi-card:hover {
-  box-shadow: var(--shadow-md), 0 0 0 1px rgba(0,212,255,0.08);
+  box-shadow: var(--shadow-md), 0 0 0 1px rgba(0,212,255,0.22);
 }
 .dash-card:hover {
-  box-shadow: var(--shadow-sm), 0 0 0 1px rgba(0,212,255,0.06);
+  box-shadow: var(--shadow-sm), 0 0 0 1px rgba(0,212,255,0.16);
 }
 
 /* ═══════════════════════════════════════════════════════
- * Modal 标题装饰线 — 青色底划线 (保留)
+ * Modal 标题装饰线 — 青色底划线
  * ═══════════════════════════════════════════════════════ */
 
 .modal h3::after {
@@ -2899,7 +2900,7 @@ tr.rank-1 td {
 }
 
 /* ═══════════════════════════════════════════════════════
- * 登录画面 — 冷色浮动粒子 (去金留青)
+ * 登录画面 — 可见冷色浮动粒子
  * ═══════════════════════════════════════════════════════ */
 
 #pw-overlay::before {
@@ -2908,12 +2909,12 @@ tr.rank-1 td {
   top: -50%; left: -50%;
   width: 200%; height: 200%;
   background:
-    radial-gradient(1.5px 1.5px at 10% 20%, rgba(0,212,255,0.18) 0%, transparent 100%),
-    radial-gradient(1.5px 1.5px at 25% 65%, rgba(0,149,255,0.14) 0%, transparent 100%),
-    radial-gradient(1px 1px at 40% 40%, rgba(0,212,255,0.12) 0%, transparent 100%),
-    radial-gradient(1.5px 1.5px at 55% 80%, rgba(124,58,237,0.12) 0%, transparent 100%),
-    radial-gradient(1px 1px at 70% 15%, rgba(0,212,255,0.1) 0%, transparent 100%),
-    radial-gradient(1.5px 1.5px at 85% 55%, rgba(0,149,255,0.12) 0%, transparent 100%);
+    radial-gradient(2px 2px at 10% 20%, rgba(0,212,255,0.28) 0%, transparent 100%),
+    radial-gradient(2px 2px at 25% 65%, rgba(0,149,255,0.22) 0%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 40% 40%, rgba(0,212,255,0.18) 0%, transparent 100%),
+    radial-gradient(2px 2px at 55% 80%, rgba(124,58,237,0.18) 0%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 70% 15%, rgba(0,212,255,0.16) 0%, transparent 100%),
+    radial-gradient(2px 2px at 85% 55%, rgba(0,149,255,0.18) 0%, transparent 100%);
   animation: floatParticles 20s linear infinite;
   pointer-events: none;
   z-index: 0;
@@ -2925,7 +2926,6 @@ tr.rank-1 td {
   75%  { transform: translate(1.5%, 1%); }
   100% { transform: translate(0, 0); }
 }
-/* 确保登录框在粒子之上 */
 #pw-box {
   position: relative;
   z-index: 1;
@@ -2938,27 +2938,27 @@ tr.rank-1 td {
 .sb-item.active::after { display: none; }
 
 /* ═══════════════════════════════════════════════════════
- * Logo 发光降级 — 从金色 glow 改为微青
+ * Logo 发光 — 可见青色冷光 + 呼吸动画
  * ═══════════════════════════════════════════════════════ */
 
 .sb-logo-svg {
-  filter: drop-shadow(0 0 8px rgba(0,212,255,0.15));
+  filter: drop-shadow(0 0 14px rgba(0,212,255,0.28));
   transition: filter var(--trans-slow);
 }
 .sb-logo-svg:hover {
-  filter: drop-shadow(0 0 14px rgba(0,212,255,0.25));
+  filter: drop-shadow(0 0 20px rgba(0,212,255,0.40));
 }
 .pw-logo-svg {
-  filter: drop-shadow(0 0 10px rgba(0,212,255,0.2));
+  filter: drop-shadow(0 0 14px rgba(0,212,255,0.32));
   animation: pwLogoPulse 4s ease-in-out infinite;
 }
 @keyframes pwLogoPulse {
-  0%, 100% { filter: drop-shadow(0 0 10px rgba(0,212,255,0.2)); }
-  50% { filter: drop-shadow(0 0 18px rgba(0,212,255,0.4)); }
+  0%, 100% { filter: drop-shadow(0 0 14px rgba(0,212,255,0.28)); }
+  50% { filter: drop-shadow(0 0 24px rgba(0,212,255,0.55)); }
 }
 
 /* ═══════════════════════════════════════════════════════
- * 登录框 / 密码输入 — 科技冷色替代金色
+ * 登录框 / 密码输入 — 科技冷色
  * ═══════════════════════════════════════════════════════ */
 
 #pw-box {
@@ -2966,11 +2966,11 @@ tr.rank-1 td {
 }
 #pw-input:focus {
   border-color: var(--tech-cyan);
-  box-shadow: 0 0 12px rgba(0,212,255,0.12);
+  box-shadow: 0 0 14px rgba(0,212,255,0.22);
   background: var(--bg-elevated);
 }
 .pw-input-wrap:focus-within {
-  box-shadow: 0 0 0 2px rgba(0,212,255,0.1);
+  box-shadow: 0 0 0 2px rgba(0,212,255,0.18);
   border-radius: var(--radius-sm);
 }
 #pw-input:focus ~ .pw-lock-icon,
@@ -2978,7 +2978,7 @@ tr.rank-1 td {
   color: var(--tech-cyan);
 }
 
-/* 登录按钮 — 科技渐变替代金色 */
+/* 登录按钮 — 科技渐变 */
 .pw-btn {
   width: 100%; padding: 10px;
   background: transparent;
@@ -2990,10 +2990,10 @@ tr.rank-1 td {
   transition: all var(--trans-base);
 }
 .pw-btn:hover {
-  background: rgba(0,212,255,0.08);
+  background: rgba(0,212,255,0.12);
   color: #00e0ff;
   border-color: var(--tech-cyan);
-  box-shadow: 0 0 14px rgba(0,212,255,0.15);
+  box-shadow: 0 0 18px rgba(0,212,255,0.28);
 }
 
 .pw-divider {
@@ -3014,21 +3014,21 @@ tr.rank-1 td {
 .pw-emblem-text { color: var(--tech-cyan); letter-spacing: 2px; }
 
 /* ═══════════════════════════════════════════════════════
- * 按钮 hover glow 克制化 (#14)
+ * 按钮 hover glow — 可见反馈
  * ═══════════════════════════════════════════════════════ */
 
 .btn-primary:hover {
-  box-shadow: 0 0 10px rgba(0,212,255,0.18);
+  box-shadow: 0 0 14px rgba(0,212,255,0.28);
 }
 
 /* ═══════════════════════════════════════════════════════
- * Section header — 移除金箔斑驳 (已在 layout 中用 ::after 做青色线)
+ * Section header — 移除金箔斑驳
  * ═══════════════════════════════════════════════════════ */
 
 .section-header::before { display: none; }
 
 /* ═══════════════════════════════════════════════════════
- * Content card hover — 青色微光替代金色线
+ * Content card hover — 可见青色微光
  * ═══════════════════════════════════════════════════════ */
 
 .content-card::before {
@@ -3038,13 +3038,61 @@ tr.rank-1 td {
   height: 1px;
   background: linear-gradient(90deg,
     transparent 0%,
-    rgba(0,212,255,0.06) 50%,
+    rgba(0,212,255,0.14) 50%,
     transparent 100%
   );
   opacity: 0;
   transition: opacity 0.3s ease;
 }
 .content-card:hover::before { opacity: 1; }
+
+/* ═══════════════════════════════════════════════════════
+ * Phase B: 覆盖 layout.css 中残留的装饰性金色
+ * ═══════════════════════════════════════════════════════ */
+
+/* 侧栏 Logo 底边 → 青色 */
+.sb-logo {
+  border-bottom: 1px solid rgba(0,212,255,0.15);
+}
+
+/* 侧栏月份文字 → 青色 */
+.sb-month {
+  color: var(--tech-cyan);
+}
+
+/* 侧栏版本号底线 → 青色 */
+.sb-version {
+  text-decoration-color: var(--tech-cyan);
+}
+
+/* 页面切换进度条 → 去金，保留纯科技色 */
+#page-progress-bar {
+  background: linear-gradient(90deg, var(--tech-cyan), var(--electric-violet));
+  background-size: 200% 100%;
+}
+
+/* 同步进度条 → 去金 */
+#sync-progress-fill {
+  background: linear-gradient(90deg,
+    var(--tech-cyan), var(--electric-violet),
+    var(--tech-cyan)
+  );
+  background-size: 300% 100%;
+}
+
+/* ═══════════════════════════════════════════════════════
+ * Phase C: 新增科技感视觉锚点
+ * ═══════════════════════════════════════════════════════ */
+
+/* Topbar 底边 — 青色细线，一眼科技感 */
+#topbar {
+  border-bottom: 1px solid rgba(0,212,255,0.14);
+}
+
+/* 侧栏右边 — 青色微光 */
+#sidebar {
+  border-right: 1px solid rgba(0,212,255,0.10);
+}
 
 /* css/mobile.css */
 /* ============================================================================
@@ -3995,7 +4043,7 @@ tr.rank-1 td {
   <!-- Firebase 初始化已统一由 src/sync/firebase.js 的 initFirebase() 处理（带重试） -->
 
   <!-- JS: 合并后由 build.js 输出为 app.js -->
-  <script src="app.js?v=13.0.3.1782380612804"></script>
+  <script src="app.js?v=13.0.3.1782382947297"></script>
 </head>
 <body>
 
@@ -4671,6 +4719,6 @@ tr.rank-1 td {
     })();
   </script>
 
-  <!-- BUILD: v13.0.3 | 2026-06-24 | 2026-06-25T09:43:32.804Z -->
+  <!-- BUILD: v13.0.3 | 2026-06-24 | 2026-06-25T10:22:27.297Z -->
 </body>
 </html>
