@@ -5893,6 +5893,9 @@ function syncUploadAll() {
 
   Events.emit(EVENTS.SYNC_START);
 
+  // #52 同步进度条
+  if (typeof showSyncProgress === 'function') showSyncProgress();
+
   var txs = State.get('txs');
   var fundWithdrawals = State.get('fundWithdrawals');
   // ★ FIX: agentList 不在函數入口捕獲，避免 watchers 更新後用舊數據覆蓋
@@ -6078,6 +6081,8 @@ function syncUploadAll() {
   db.ref(FB_PATH.ARCHIVES).set(archives);
 
   Events.emit(EVENTS.SYNC_COMPLETE);
+  // #52 同步进度条
+  if (typeof hideSyncProgress === 'function') hideSyncProgress();
 }
 
 /**
@@ -6435,6 +6440,9 @@ function stopWatchers() {
 function syncDownloadAll() {
   var db = getDB();
   if (!db) return;
+
+  // #52 同步进度条
+  if (typeof showSyncProgress === 'function') showSyncProgress();
 
   db.ref(FB_PATH.TXS).once('value', function(snap) {
     var remote = fbObjToArray(snap.val());
@@ -11906,7 +11914,15 @@ function hcRender(filterCasino, filterHotel, filterSearch) {
     var emptyTd = document.createElement('td');
     emptyTd.colSpan = 10;
     emptyTd.style.cssText = 'text-align:center;padding:24px;color:' + UI_COLORS.textMuted;
-    emptyTd.textContent = '暫無資料';
+    // #40 区分「完全無資料」和「無匹配結果」
+    var hasFilters = !!(fCasino || fHotel || fSearchLower);
+    if (config.length === 0) {
+      emptyTd.textContent = '暫無資料，請點擊「+ 新增房型」添加';
+    } else if (hasFilters) {
+      emptyTd.textContent = '無匹配結果，請調整篩選條件';
+    } else {
+      emptyTd.textContent = '暫無資料';
+    }
     emptyTr.appendChild(emptyTd);
     tbody.appendChild(emptyTr);
     hcUpdateBatchBar();
@@ -12137,8 +12153,14 @@ function v13LoginFallback() {
   if (result.success) {
     if (errorEl) errorEl.textContent = '';
     if (attemptsEl) attemptsEl.textContent = '';
+    if (inputEl) inputEl.classList.remove('pw-error');
   } else {
     if (errorEl) errorEl.textContent = result.error || '驗證失敗';
+    if (inputEl) {
+      inputEl.classList.remove('pw-error');
+      void inputEl.offsetWidth;
+      inputEl.classList.add('pw-error');
+    }
     // 自动从 _pwAttempts(若可访问) 或直接隐藏
     if (attemptsEl) {
       var maxAttempts = (typeof CONFIG !== 'undefined' && CONFIG.MAX_PW_ATTEMPTS) ? CONFIG.MAX_PW_ATTEMPTS : 3;
@@ -12201,6 +12223,64 @@ Events.on(EVENTS.HC_CONFIG_UPDATED, function() {
     RM.populateCasinoDropdown();
   }
 });
+
+// ============================================================================
+// 快捷键帮助面板 (#48)
+// ============================================================================
+
+/**
+ * 渲染快捷键帮助 Modal — 两栏表格显示所有快捷键
+ */
+function renderShortcutHelp() {
+  var listEl = document.getElementById('shortcut-list');
+  if (!listEl) return;
+
+  var shortcuts = (typeof SHORTCUTS !== 'undefined') ? SHORTCUTS : [];
+
+  var html = '<table class="shortcut-table"><thead><tr><th>快捷鍵</th><th>功能說明</th></tr></thead><tbody>';
+  for (var i = 0; i < shortcuts.length; i++) {
+    var s = shortcuts[i];
+    html += '<tr><td class="sc-key"><kbd>' + (s.keys || '') + '</kbd></td>';
+    html += '<td class="sc-desc">' + (s.desc || '') + '</td></tr>';
+  }
+  html += '</tbody></table>';
+
+  // 额外提示
+  html += '<p class="shortcut-hint">💡 提示：按 <kbd>?</kbd> 可隨時打開此面板；按 <kbd>Ctrl+N</kbd> 快速新增交易</p>';
+
+  listEl.innerHTML = html;
+}
+
+// ============================================================================
+// 同步进度条 (#52)
+// ============================================================================
+
+var _syncProgressTimer = null;
+
+/**
+ * 显示同步进度条（不确定长度动画）
+ */
+function showSyncProgress() {
+  var bar = document.getElementById('sync-progress-bar');
+  if (!bar) return;
+  bar.classList.add('active');
+  // 自动隐藏 — 最多 10 秒后消失
+  if (_syncProgressTimer) clearTimeout(_syncProgressTimer);
+  _syncProgressTimer = setTimeout(hideSyncProgress, 10000);
+}
+
+/**
+ * 隐藏同步进度条
+ */
+function hideSyncProgress() {
+  var bar = document.getElementById('sync-progress-bar');
+  if (!bar) return;
+  bar.classList.remove('active');
+  if (_syncProgressTimer) {
+    clearTimeout(_syncProgressTimer);
+    _syncProgressTimer = null;
+  }
+}
 
 // ============================================================================
 // JSON 备份导出/导入
@@ -12392,6 +12472,7 @@ function triggerJSONImport() {
         var result = checkPassword(input.value);
         if (result.success) {
           if (errorEl) errorEl.style.display = 'none';
+          input.classList.remove('pw-error');
           // 登入成功后初始化应用
           initAppAfterLogin();
         } else {
@@ -12399,6 +12480,9 @@ function triggerJSONImport() {
             errorEl.textContent = result.error;
             errorEl.style.display = 'block';
           }
+          input.classList.remove('pw-error');
+          void input.offsetWidth; // 触发重排以重新播放动画
+          input.classList.add('pw-error');
           input.value = '';
         }
       });

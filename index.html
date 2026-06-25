@@ -11,7 +11,7 @@
   <!-- 版本快取清除 -->
   <script>
     (function() {
-      var APP_VERSION = '13.0.3.1782367009089';
+      var APP_VERSION = '13.0.3.1782372118545';
       var stored = localStorage.getItem('macau_app_version');
       var qs = location.search || '';
       if (stored && stored !== APP_VERSION && !sessionStorage.getItem('_v13_reloaded')) {
@@ -397,9 +397,14 @@ a:focus-visible,
 .sb-toggle:hover { color: var(--text-primary); }
 .sb-version {
   padding: 6px 16px 10px;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
   text-align: center;
+  text-decoration: underline;
+  text-decoration-color: var(--gold-soft);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  letter-spacing: 0.5px;
 }
 
 /* Sidebar Overlay (手机) */
@@ -806,6 +811,14 @@ a:focus-visible,
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
   background: var(--bg-elevated);
+  /* #56 横向滑动渐层阴影提示 */
+  background-image:
+    /* 左侧阴影 */  linear-gradient(to right, rgba(0,0,0,0.12), transparent 50%),
+    /* 右侧阴影 */  linear-gradient(to left,  rgba(0,0,0,0.12), transparent 50%);
+  background-repeat: no-repeat;
+  background-position: left center, right center;
+  background-size: 24px 100%, 24px 100%;
+  background-attachment: local, local;
 }
 
 /* ── Toolbar ── */
@@ -944,6 +957,37 @@ a:focus-visible,
 @keyframes progress-bar-shimmer {
   0%   { background-position: 200% 0; }
   100%  { background-position: -200% 0; }
+}
+
+/* ══════════════════════════════════════════════════════
+ * 同步进度条 (#52) — Topbar 下方细条
+ * ══════════════════════════════════════════════════════ */
+#sync-progress-bar {
+  height: 3px;
+  background: var(--bg-surface);
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+#sync-progress-bar.active {
+  opacity: 1;
+}
+#sync-progress-fill {
+  height: 100%;
+  width: 30%;
+  background: linear-gradient(90deg,
+    var(--tech-cyan), var(--electric-violet), var(--gold-soft),
+    var(--tech-cyan)
+  );
+  background-size: 300% 100%;
+  animation: sync-progress-indeterminate 1.8s ease-in-out infinite;
+  border-radius: 0 2px 2px 0;
+}
+@keyframes sync-progress-indeterminate {
+  0%   { transform: translateX(-100%); }
+  50%  { transform: translateX(200%); }
+  100% { transform: translateX(600%); }
 }
 
 #sidebar-toggle {
@@ -1618,6 +1662,24 @@ a:focus-visible,
   80% { transform: translateX(4px); }
 }
 .pw-shake { animation: pwShake 0.4s ease; }
+
+/* #10 密码错误增强：红色边框闪烁 + 抖动 */
+@keyframes pwErrorFlash {
+  0%   { border-color: var(--danger); box-shadow: 0 0 0 0 rgba(231,76,60,0.6); transform: translateX(0); }
+  15%  { border-color: var(--danger); box-shadow: 0 0 12px 2px rgba(231,76,60,0.5); transform: translateX(-4px); }
+  30%  { border-color: var(--danger); box-shadow: 0 0 0 0 rgba(231,76,60,0); transform: translateX(4px); }
+  45%  { border-color: var(--danger); box-shadow: 0 0 8px 1px rgba(231,76,60,0.3); transform: translateX(-3px); }
+  60%  { border-color: var(--danger); box-shadow: 0 0 0 0 rgba(231,76,60,0); transform: translateX(3px); }
+  75%  { border-color: rgba(231,76,60,0.5); box-shadow: 0 0 4px 0px rgba(231,76,60,0.15); transform: translateX(0); }
+  100% { border-color: var(--border-subtle); box-shadow: none; transform: translateX(0); }
+}
+#pw-input.pw-error {
+  animation: pwErrorFlash 0.7s ease;
+}
+#pw-input.pw-error:focus {
+  border-color: var(--danger);
+  box-shadow: 0 0 10px rgba(231,76,60,0.15);
+}
 
 /* ═══════════════════════════════════════════════════════
  * 版本徽章 & 回到顶部
@@ -2453,6 +2515,23 @@ input[type="range"]:focus {
   padding: 60px 20px;
   color: var(--text-muted);
   text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+/* #59 云纹装饰 — 空状态下浮现淡墨云烟 */
+.empty-state::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.06;
+  background:
+    radial-gradient(ellipse 180px 40px at 20% 30%, var(--gold-soft), transparent),
+    radial-gradient(ellipse 200px 50px at 70% 40%, var(--sky-blue), transparent),
+    radial-gradient(ellipse 160px 35px at 50% 60%, var(--tech-cyan), transparent),
+    radial-gradient(ellipse 140px 30px at 30% 75%, var(--gold-soft), transparent),
+    radial-gradient(ellipse 170px 45px at 80% 70%, var(--sky-blue), transparent),
+    radial-gradient(ellipse 120px 28px at 15% 15%, var(--tech-cyan), transparent);
 }
 .empty-state .empty-icon {
   font-size: 48px;
@@ -2675,6 +2754,69 @@ input[type="range"]:focus {
 .form-error-summary.visible {
   display: block;
   animation: errorFadeIn 0.2s ease;
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 快捷键帮助面板 (#48)
+ * ═══════════════════════════════════════════════════════ */
+
+.shortcut-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 13px;
+}
+.shortcut-table th {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 2px solid var(--border-subtle);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.shortcut-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  color: var(--text-secondary);
+}
+.shortcut-table tbody tr:hover td {
+  background: rgba(255,255,255,0.03);
+}
+.shortcut-table .sc-key {
+  width: 120px;
+  white-space: nowrap;
+}
+.shortcut-table kbd {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: var(--gold-soft);
+  line-height: 1.6;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+.shortcut-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+  text-align: center;
+}
+.shortcut-hint kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  color: var(--tech-cyan);
 }
 
 /* css/china-theme.css */
@@ -3865,6 +4007,7 @@ tr.rank-1 td {
       }
       if (errorEl) { errorEl.textContent = '密碼錯誤'; errorEl.style.display = 'block'; }
       input.value = '';
+      input.classList.remove('pw-error'); void input.offsetWidth; input.classList.add('pw-error');
       if (btn) { btn.classList.add('pw-shake'); setTimeout(function() { btn.classList.remove('pw-shake'); }, 500); }
     }
     // Enter 键触发登录
@@ -3898,7 +4041,7 @@ tr.rank-1 td {
   <!-- Firebase 初始化已统一由 src/sync/firebase.js 的 initFirebase() 处理（带重试） -->
 
   <!-- JS: 合并后由 build.js 输出为 app.js -->
-  <script src="app.js?v=13.0.3.1782367009089"></script>
+  <script src="app.js?v=13.0.3.1782372118545"></script>
 </head>
 <body>
 
@@ -4027,10 +4170,13 @@ tr.rank-1 td {
           <button class="btn btn-sm" onclick="downloadJSONBackup()" title="下載完整JSON備份"><span>💾 匯出JSON</span></button>
           <button class="btn btn-sm" onclick="triggerJSONImport()" title="從JSON檔案還原備份"><span>📥 匯入JSON</span></button>
           <button class="btn btn-sm" onclick="syncUploadAll();showToast('同步中…','info')"><span>🔄 同步</span></button>
-          <button class="btn btn-sm" onclick="openModal('shortcut-help-modal')"><span>⌨️ 快捷鍵</span></button>
+          <button class="btn btn-sm" onclick="renderShortcutHelp();openModal('shortcut-help-modal')"><span>⌨️ 快捷鍵</span></button>
           <button class="btn btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="clearAllDataConfirm()" title="清除所有數據（危險操作）"><span>🗑️ 清除</span></button>
         </div>
       </div>
+
+      <!-- 同步进度条 -->
+      <div id="sync-progress-bar"><div id="sync-progress-fill"></div></div>
 
       <!-- 页面区 -->
       <div id="page-scroll">
@@ -4571,6 +4717,6 @@ tr.rank-1 td {
     })();
   </script>
 
-  <!-- BUILD: v13.0.3 | 2026-06-24 | 2026-06-25T05:56:49.090Z -->
+  <!-- BUILD: v13.0.3 | 2026-06-24 | 2026-06-25T07:21:58.545Z -->
 </body>
 </html>
