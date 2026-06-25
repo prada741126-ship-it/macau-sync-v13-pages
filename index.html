@@ -11,7 +11,7 @@
   <!-- 版本快取清除 -->
   <script>
     (function() {
-      var APP_VERSION = '13.0.3.1782300146225';
+      var APP_VERSION = '13.0.3.1782367009089';
       var stored = localStorage.getItem('macau_app_version');
       var qs = location.search || '';
       if (stored && stored !== APP_VERSION && !sessionStorage.getItem('_v13_reloaded')) {
@@ -158,7 +158,7 @@ a:hover { text-decoration: underline; }
 /* 滚动条 */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; transition: background 0.2s ease; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
 
 /* 选中 */
@@ -223,6 +223,11 @@ tr:nth-child(even) td {
 }
 tr:hover td {
   background: rgba(255,255,255,0.03);
+}
+/* 点击反馈 */
+tr:active td {
+  background: rgba(0,212,255,0.04) !important;
+  transition: background 0.08s ease;
 }
 
 /* 键盘焦点环 — Tab 导航可见指示器 */
@@ -317,7 +322,7 @@ a:focus-visible,
   padding: 10px 16px;
   cursor: pointer;
   color: var(--text-secondary);
-  transition: color 0.25s ease, background 0.25s ease, border-color 0.25s ease, padding-left 0.25s ease;
+  transition: color 0.25s ease, background 0.25s ease, border-left-color 0.3s ease, padding-left 0.3s ease;
   font-size: 13px;
   border-left: 3px solid transparent;
   position: relative;
@@ -427,6 +432,7 @@ a:focus-visible,
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border-subtle);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
   display: flex;
   align-items: center;
   padding: 0 20px;
@@ -657,6 +663,7 @@ a:focus-visible,
   transition: all var(--trans-base);
   position: relative;
   overflow: hidden;
+  min-width: 0;
   box-shadow: var(--shadow-surface);
 }
 .kpi-card::before {
@@ -717,6 +724,21 @@ a:focus-visible,
 .kpi-card-value.orange { color: var(--cash-orange); }
 .kpi-card-value.blue { color: var(--sky-blue); }
 .kpi-card-value.violet { color: var(--electric-violet); }
+
+/* KPI 数字入场动画 — 页面切换时交错淡入 */
+.page.active .kpi-card-value {
+  animation: kpiValueEnter 0.45s ease-out both;
+}
+@keyframes kpiValueEnter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page.active .kpi-card:nth-child(1) .kpi-card-value { animation-delay: 0.03s; }
+.page.active .kpi-card:nth-child(2) .kpi-card-value { animation-delay: 0.08s; }
+.page.active .kpi-card:nth-child(3) .kpi-card-value { animation-delay: 0.13s; }
+.page.active .kpi-card:nth-child(4) .kpi-card-value { animation-delay: 0.18s; }
+.page.active .kpi-card:nth-child(5) .kpi-card-value { animation-delay: 0.23s; }
+.page.active .kpi-card:nth-child(6) .kpi-card-value { animation-delay: 0.28s; }
 
 /* ── Two Column Layout ── */
 .two-col {
@@ -1140,6 +1162,26 @@ a:focus-visible,
   color: rgba(201,168,76,0.4);
 }
 
+/* 加载态 — 文字半透明 + 左侧 spinner */
+.btn-loading {
+  pointer-events: none;
+  opacity: 0.75;
+}
+.btn-loading::before {
+  content: '';
+  display: inline-block;
+  width: 12px; height: 12px;
+  margin-right: 4px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: btnSpinner 0.5s linear infinite;
+  vertical-align: -1px;
+}
+@keyframes btnSpinner {
+  to { transform: rotate(360deg); }
+}
+
 /* Ghost (透明背景) */
 .btn-ghost {
   background: transparent;
@@ -1373,6 +1415,22 @@ a:focus-visible,
   from { opacity: 1; transform: translateX(0); }
   to   { opacity: 0; transform: translateX(40px); }
 }
+
+/* Toast 底部剩余时间进度条 */
+.toast::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0;
+  height: 2px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  animation: toastTimer 3s linear forwards;
+}
+@keyframes toastTimer {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+.toast { position: relative; overflow: hidden; }
 
 /* ═══════════════════════════════════════════════════════
  * 加载动画
@@ -3065,15 +3123,19 @@ tr.rank-1 td {
   }
   .nav-item .icon { font-size: 18px; }
   .nav-item.active { color: var(--tech-cyan); }
-  .nav-item.active::before {
+  .nav-item::before {
     content: '';
     position: absolute;
     top: 0; left: 50%;
-    transform: translateX(-50%);
+    transform: translateX(-50%) scaleX(0);
     width: 20px;
     height: 2px;
     background: var(--tech-cyan);
     border-radius: 0 0 2px 2px;
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .nav-item.active::before {
+    transform: translateX(-50%) scaleX(1);
   }
   .nav-item:active { transform: scale(0.95); }
 
@@ -3095,11 +3157,28 @@ tr.rank-1 td {
 
   /* ── KPI Grid → 2列 ── */
   .kpi-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
   }
-  .kpi-card { padding: 12px; }
-  .kpi-card-value { font-size: 20px; }
+  .kpi-card {
+    padding: 10px;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .kpi-card-label {
+    font-size: 11px;
+    letter-spacing: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 4px;
+  }
+  .kpi-card-value {
+    font-size: 18px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 
   /* ── 仪表板 Grid → 2列 ── */
   .dash-grid,
@@ -3381,12 +3460,12 @@ tr.rank-1 td {
 
 @media (max-width: 380px) {
   .kpi-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
   }
-  .kpi-card { padding: 10px; }
-  .kpi-card-value { font-size: 18px; }
-  .kpi-card-label { font-size: 10px; }
+  .kpi-card { padding: 8px; min-width: 0; overflow: hidden; }
+  .kpi-card-value { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kpi-card-label { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   .dash-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -3819,7 +3898,7 @@ tr.rank-1 td {
   <!-- Firebase 初始化已统一由 src/sync/firebase.js 的 initFirebase() 处理（带重试） -->
 
   <!-- JS: 合并后由 build.js 输出为 app.js -->
-  <script src="app.js?v=13.0.3.1782300146225"></script>
+  <script src="app.js?v=13.0.3.1782367009089"></script>
 </head>
 <body>
 
@@ -3865,7 +3944,7 @@ tr.rank-1 td {
       </div>
       <div id="pw-error"></div>
       <div id="pw-attempts"></div>
-      <button class="pw-btn" onclick="_v13LoginFallback()">驗 證 進 入</button>
+      <button class="pw-btn" onclick="v13LoginFallback()">驗 證 進 入</button>
       <div id="pw-version">v13.0.3</div>
     </div>
   </div>
@@ -3945,6 +4024,8 @@ tr.rank-1 td {
         <div id="topbar-actions">
           <button class="btn btn-primary btn-sm" onclick="Events.emit('tx:new')"><span>+ 新增</span></button>
           <button class="btn btn-sm" onclick="doBackup()"><span>📦 備份</span></button>
+          <button class="btn btn-sm" onclick="downloadJSONBackup()" title="下載完整JSON備份"><span>💾 匯出JSON</span></button>
+          <button class="btn btn-sm" onclick="triggerJSONImport()" title="從JSON檔案還原備份"><span>📥 匯入JSON</span></button>
           <button class="btn btn-sm" onclick="syncUploadAll();showToast('同步中…','info')"><span>🔄 同步</span></button>
           <button class="btn btn-sm" onclick="openModal('shortcut-help-modal')"><span>⌨️ 快捷鍵</span></button>
           <button class="btn btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="clearAllDataConfirm()" title="清除所有數據（危險操作）"><span>🗑️ 清除</span></button>
@@ -4064,6 +4145,15 @@ tr.rank-1 td {
             <span class="search-box"><input type="text" id="query-search" placeholder="搜索..." style="width:160px" oninput="doQuery()">
             <button class="search-clear" onclick="document.getElementById('query-search').value='';doQuery()" title="清除搜索">✕</button></span>
             <button class="btn btn-sm btn-primary" onclick="doQuery()">🔍 查詢</button>
+          </div>
+          <!-- ★ 已存筛选器 -->
+          <div class="toolbar" style="margin-top:4px;padding:6px 0">
+            <span style="font-size:11px;color:var(--text-muted);margin-right:6px">📌 已存篩選:</span>
+            <select id="query-saved-filters" onchange="loadSavedFilter(this.value)" style="min-width:150px;font-size:12px" disabled>
+              <option value="">(無已存篩選)</option>
+            </select>
+            <button class="btn btn-sm" style="font-size:11px" onclick="saveCurrentFilter()" title="儲存目前篩選條件">💾 儲存</button>
+            <button class="btn btn-sm" style="font-size:11px" onclick="deleteSavedFilter()" title="刪除已存篩選">🗑️</button>
           </div>
           <div id="query-kpi" class="kpi-grid"></div>
           <div class="table-scroll">
@@ -4266,7 +4356,7 @@ tr.rank-1 td {
             <input type="hidden" name="date" id="tx-date">
           </div>
         </div>
-        <div class="form-row"><label>代理</label><select name="agent" id="tx-agent" onchange="_onAgentChange()"><option value="">選擇代理</option></select></div>
+        <div class="form-row"><label>代理</label><select name="agent" id="tx-agent" onchange="onAgentChange()"><option value="">選擇代理</option></select></div>
         <div class="form-row"><label>客戶</label><input type="text" name="client" id="tx-client"></div>
         <div class="form-row"><label>地點</label><select name="venue" id="tx-venue"><option value="">選擇地點</option></select></div>
         <div class="form-row"><label>洗碼量(萬)</label><input type="number" name="volume" id="tx-volume" step="0.01" oninput="recalcComm()"></div>
@@ -4481,6 +4571,6 @@ tr.rank-1 td {
     })();
   </script>
 
-  <!-- BUILD: v13.0.3 | 2026-06-24 | 2026-06-24T11:22:26.225Z -->
+  <!-- BUILD: v13.0.3 | 2026-06-24 | 2026-06-25T05:56:49.090Z -->
 </body>
 </html>

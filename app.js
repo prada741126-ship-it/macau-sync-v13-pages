@@ -24,8 +24,7 @@ var APP = {
   SYSTEM_EN:     'BOYING INTERNATIONAL CLUB',
   LOGIN_TITLE:   '授 權 驗 證',
   LOGO_CHAR:     '\u2660',  // ♠
-  PWD_PLAIN:     'macau888',
-  PWD_ENCODED:   'bWFjYXU4ODg=',  // btoa('macau888')
+  PWD_HASH:       '8204868322789a563871ffa6e828a1f096b4c4cec66706ee848283fae65551d6',  // SHA-256('macau888')
 };
 
 // ============================================================================
@@ -39,6 +38,7 @@ var CONFIG = {
   BACKUP_RETENTION:   7,             // 保留 7 天
   SYNC_RETRY_MAX:     3,
   SYNC_RETRY_BASE:    500,           // 首次重试延迟 (ms)
+  TOMBSTONE_TTL_MS:   30 * 24 * 60 * 60 * 1000,  // 墓碑保留 30 天，超期后从 Firebase 清除
   PRODUCTION:         false,         // 生产模式开关
 };
 
@@ -863,7 +863,7 @@ function throttle(func, limit) {
 /**
  * v13 加密/解密模块
  * 
- * 依赖: core/constants.js (APP.PWD_ENCODED), CryptoJS (CDN)
+ * 依赖: core/constants.js (APP.PWD_HASH), CryptoJS (CDN)
  * 影响: core/store.js (localStorage 持久化)
  * 
  * 对照档: 第七节模块2, 第十节安全防护
@@ -1018,13 +1018,22 @@ function clearSessionPw() {
 }
 
 /**
- * 验证密码
+ * 验证密码 (SHA-256 比对，不含明文)
  * @param {string} input - 用户输入
  * @returns {boolean}
  */
 function verifyPassword(input) {
-  var decoded = atob(APP.PWD_ENCODED);
-  return input === decoded;
+  if (typeof CryptoJS === 'undefined' || !CryptoJS.SHA256) {
+    console.error('[v13:crypto] verifyPassword: CryptoJS not available, cannot verify');
+    return false;
+  }
+  try {
+    var hash = CryptoJS.SHA256(input).toString();
+    return hash === APP.PWD_HASH;
+  } catch (e) {
+    console.error('[v13:crypto] verifyPassword error:', e);
+    return false;
+  }
 }
 
 // ============================================================================
@@ -1032,12 +1041,15 @@ function verifyPassword(input) {
 // ============================================================================
 
 /**
- * 获取加密密钥 (密码的 SHA256 hash)
+ * 获取加密密钥 (直接使用预计算的 SHA-256 哈希)
  * @returns {string}
  */
 function _getEncKey() {
   var pw = getSessionPw();
-  if (!pw) pw = atob(APP.PWD_ENCODED);  // 回退默认密码
+  if (!pw) return APP.PWD_HASH;  // 回退：直接用预计算哈希
+  // 如果 session 中存储的就是哈希 (autoLogin 场景)，直接使用
+  if (pw === APP.PWD_HASH) return pw;
+  // 用户手动登录时，session 存储的是明文，需要哈希
   return CryptoJS.SHA256(pw).toString();
 }
 
@@ -1383,7 +1395,8 @@ var State = (function() {
     bookingEditingId: null,   // 订房编辑中
     hcEditingId: null,        // 酒店设定编辑中
     syncConnected: true,      // Firebase 连接状态
-    isLocked: false,          // 月末是否已锁定
+    isLocked: false,          // 月末是否已锁定（向后兼容）
+    lockedMonths: {},         // 已关账月份集合 { "2026-05": true }
     currentTimeFilter: null,  // 总览时间筛选器
     isModalOpen: false,       // 是否有弹窗开启（影响快捷键行为）
     sidebarCollapsed: false,  // 侧边栏是否折叠
@@ -1404,24 +1417,6 @@ var State = (function() {
     // --- 草稿 ---
     draftTimer: null,         // 草稿防抖 timer
   };
-
-  // ========================================================================
-  // 全局变量兼容 (旧代码引用的 var 变量)
-  // 这些变量由 State.set 自动同步，旧模块可通过 var 直接访问
-  // ========================================================================
-  window.txs = _state.txs;
-  window.fundWithdrawals = _state.fundWithdrawals;
-  window.agentWallets = _state.agentWallets;
-  window.agentList = _state.agentList;
-  window.workingMonth = _state.workingMonth;
-  window.nextId = _state.nextId;
-  window.fundNextId = _state.fundNextId;
-  window.agentWalletNextId = _state.walletNextId;
-  window.editId = _state.editingId;
-  window.sortState = _state.sortState;
-  window._syncConnected = _state.syncConnected;
-  window._draftTimer = _state.draftTimer;
-  window.__currentTimeFilter = _state.currentTimeFilter;
 
   // ========================================================================
   // 事件→State 路径映射 (set() 自动 emit 的事件)
@@ -1576,32 +1571,18 @@ var State = (function() {
   /**
    * 同步全局变量
    */
-  function _syncGlobals(key, value) {
-    var map = {
-      'txs':              function(v) { window.txs = v; },
-      'fundWithdrawals':  function(v) { window.fundWithdrawals = v; },
-      'agentWallets':     function(v) { window.agentWallets = v; },
-      'agentList':        function(v) { window.agentList = v; },
-      'workingMonth':     function(v) { window.workingMonth = v; },
-      'nextId':           function(v) { window.nextId = v; },
-      'fundNextId':       function(v) { window.fundNextId = v; },
-      'walletNextId':     function(v) { window.agentWalletNextId = v; },
-      'editingId':        function(v) { window.editId = v; },
-      'sortState':        function(v) { window.sortState = v; },
-      'syncConnected':    function(v) { window._syncConnected = v; },
-      'draftTimer':       function(v) { window._draftTimer = v; },
-      'currentTimeFilter':function(v) { window.__currentTimeFilter = v; },
-    };
-    if (map[key]) map[key](value);
+  /**
+   * (预留) 同步全局变量 — v13 已无外部模块直读 window.*，保留函数签名兼容
+   */
+  function _syncGlobals(/* key, value */) {
+    // v13 所有模块通过 State.get() 访问，不再需要 window 镜像
   }
 
   /**
-   * 同步所有全局变量
+   * (预留) 同步所有全局变量
    */
   function _syncAllGlobals() {
-    for (var key in _state) {
-      _syncGlobals(key, _state[key]);
-    }
+    // v13 所有模块通过 State.get() 访问，不再需要 window 镜像
   }
 
   // ========================================================================
@@ -2029,6 +2010,32 @@ var Store = (function() {
  */
 
 // ============================================================================
+// 轻量 Memoization（引用比较 + 参数指纹）
+// ============================================================================
+
+var _calcCache = {};
+
+/**
+ * 包装纯函数，添加引用级缓存
+ * 仅当输入数组引用相同且额外参数一致时才返回缓存
+ * @param {function} fn
+ * @param {string} name
+ * @returns {function}
+ */
+function _memoCalc(fn, name) {
+  return function(txs) {
+    var extraArgs = Array.prototype.slice.call(arguments, 1);
+    var cached = _calcCache[name];
+    if (cached && cached.ref === txs && JSON.stringify(extraArgs) === cached.args) {
+      return cached.result;
+    }
+    var result = fn.apply(null, arguments);
+    _calcCache[name] = { ref: txs, args: JSON.stringify(extraArgs), result: result };
+    return result;
+  };
+}
+
+// ============================================================================
 // 单笔交易计算
 // ============================================================================
 
@@ -2071,91 +2078,91 @@ function validateTxAmounts(tx) {
  * @param {Array} txs - 交易数组
  * @returns {number}
  */
-function totalVolume(txs) {
+var totalVolume = _memoCalc(function(txs) {
   var sum = 0;
   for (var i = 0; i < txs.length; i++) {
     sum += toNum(txs[i].volume);
   }
   return sum;
-}
+}, 'totalVolume');
 
 /**
  * 计算所有交易的佣金总和
  * @param {Array} txs
  * @returns {number}
  */
-function totalComm(txs) {
+var totalComm = _memoCalc(function(txs) {
   var sum = 0;
   for (var i = 0; i < txs.length; i++) {
     sum += toNum(txs[i].comm);
   }
   return sum;
-}
+}, 'totalComm');
 
 /**
  * 计算所有交易的码粮总和
  * @param {Array} txs
  * @returns {number}
  */
-function totalBonus(txs) {
+var totalBonus = _memoCalc(function(txs) {
   var sum = 0;
   for (var i = 0; i < txs.length; i++) {
     sum += toNum(txs[i].bonus);
   }
   return sum;
-}
+}, 'totalBonus');
 
 /**
  * 计算所有交易的公基金总和
  * @param {Array} txs
  * @returns {number}
  */
-function totalFund(txs) {
+var totalFund = _memoCalc(function(txs) {
   var sum = 0;
   for (var i = 0; i < txs.length; i++) {
     sum += toNum(txs[i].fund);
   }
   return sum;
-}
+}, 'totalFund');
 
 /**
  * 计算所有交易的已提领总和
  * @param {Array} txs
  * @returns {number}
  */
-function totalDrawn(txs) {
+var totalDrawn = _memoCalc(function(txs) {
   var sum = 0;
   for (var i = 0; i < txs.length; i++) {
     sum += toNum(txs[i].drawn);
   }
   return sum;
-}
+}, 'totalDrawn');
 
 /**
  * 计算所有交易的未提领总和
  * @param {Array} txs
  * @returns {number}
  */
-function totalUndrawn(txs) {
+var totalUndrawn = _memoCalc(function(txs) {
   var sum = 0;
   for (var i = 0; i < txs.length; i++) {
     sum += toNum(txs[i].undrawn);
   }
   return sum;
-}
+}, 'totalUndrawn');
 
 /**
  * 计算所有交易的现金寄放总和
  * @param {Array} txs
  * @returns {number}
  */
-function totalCash(txs) {
+var totalCash = _memoCalc(function(txs) {
   var sum = 0;
   for (var i = 0; i < txs.length; i++) {
     sum += toNum(txs[i].cash) || 0;
   }
   return sum;
-}
+}, 'totalCash');
 
 // ============================================================================
 // 公基金余额计算 (对照档第十一节)
@@ -2364,6 +2371,32 @@ function validateMonthBalance(month, txs, fundWithdrawals, agentWallets) {
  */
 
 // ============================================================================
+// 轻量 Memoization（引用比较 + 参数指纹）
+// ============================================================================
+
+var _statsCache = {};
+
+/**
+ * 包装纯函数，添加引用级缓存
+ * 仅当输入数组引用相同且额外参数一致时才返回缓存
+ * @param {function} fn
+ * @param {string} name
+ * @returns {function}
+ */
+function _memoStats(fn, name) {
+  return function(txs) {
+    var extraArgs = Array.prototype.slice.call(arguments, 1);
+    var cached = _statsCache[name];
+    if (cached && cached.ref === txs && JSON.stringify(extraArgs) === cached.args) {
+      return cached.result;
+    }
+    var result = fn.apply(null, arguments);
+    _statsCache[name] = { ref: txs, args: JSON.stringify(extraArgs), result: result };
+    return result;
+  };
+}
+
+// ============================================================================
 // 按维度聚合
 // ============================================================================
 
@@ -2372,7 +2405,7 @@ function validateMonthBalance(month, txs, fundWithdrawals, agentWallets) {
  * @param {Array} txs - 交易数组
  * @returns {Array} [{ agent, volume, comm, bonus, fund, drawn, undrawn, cash, count }]
  */
-function aggregateByAgent(txs) {
+var aggregateByAgent = _memoStats(function(txs) {
   var map = {};
   for (var i = 0; i < txs.length; i++) {
     var tx = txs[i];
@@ -2394,14 +2427,14 @@ function aggregateByAgent(txs) {
     result.push(map[key]);
   }
   return result;
-}
+}, 'aggregateByAgent');
 
 /**
  * 按地点聚合
  * @param {Array} txs
  * @returns {Array} [{ venue, volume, comm, bonus, fund, drawn, undrawn, cash, count }]
  */
-function aggregateByVenue(txs) {
+var aggregateByVenue = _memoStats(function(txs) {
   var map = {};
   for (var i = 0; i < txs.length; i++) {
     var tx = txs[i];
@@ -2423,14 +2456,14 @@ function aggregateByVenue(txs) {
     result.push(map[key]);
   }
   return result;
-}
+}, 'aggregateByVenue');
 
 /**
  * 按月份聚合
  * @param {Array} txs
  * @returns {Array} [{ month, volume, comm, bonus, fund, drawn, undrawn, cash, count }]
  */
-function aggregateByMonth(txs) {
+var aggregateByMonth = _memoStats(function(txs) {
   var map = {};
   for (var i = 0; i < txs.length; i++) {
     var tx = txs[i];
@@ -2454,7 +2487,7 @@ function aggregateByMonth(txs) {
   }
   result.sort(function(a, b) { return a.month.localeCompare(b.month); });
   return result;
-}
+}, 'aggregateByMonth');
 
 /**
  * 按日期聚合 (每日洗码量趋势)
@@ -2462,7 +2495,7 @@ function aggregateByMonth(txs) {
  * @param {string} [month] - 指定月份 "YYYY-MM"
  * @returns {Array} [{ date, volume, count }]
  */
-function aggregateByDay(txs, month) {
+var aggregateByDay = _memoStats(function(txs, month) {
   var map = {};
   for (var i = 0; i < txs.length; i++) {
     var tx = txs[i];
@@ -2483,14 +2516,14 @@ function aggregateByDay(txs, month) {
   }
   result.sort(function(a, b) { return a.date.localeCompare(b.date); });
   return result;
-}
+}, 'aggregateByDay');
 
 /**
  * 代理×地点 交叉聚合 (用于统计页)
  * @param {Array} txs
  * @returns {Array} [{ agent, venue, volume, comm, bonus, fund, drawn, undrawn }]
  */
-function aggregateByAgentVenue(txs) {
+var aggregateByAgentVenue = _memoStats(function(txs) {
   var map = {};
   for (var i = 0; i < txs.length; i++) {
     var tx = txs[i];
@@ -2513,7 +2546,7 @@ function aggregateByAgentVenue(txs) {
   var result = [];
   for (var k in map) { result.push(map[k]); }
   return result;
-}
+}, 'aggregateByAgentVenue');
 
 // ============================================================================
 // 排名
@@ -2525,7 +2558,7 @@ function aggregateByAgentVenue(txs) {
  * @param {number} [topN=10]
  * @returns {Array} [{ agent, volume, rank }]
  */
-function rankByVolume(txs, topN) {
+var rankByVolume = _memoStats(function(txs, topN) {
   if (!topN) topN = 10;
   var agg = aggregateByAgent(txs);
   agg.sort(function(a, b) { return b.volume - a.volume; });
@@ -2534,7 +2567,7 @@ function rankByVolume(txs, topN) {
     result[i].rank = i + 1;
   }
   return result;
-}
+}, 'rankByVolume');
 
 /**
  * 代理按佣金排名
@@ -2542,7 +2575,7 @@ function rankByVolume(txs, topN) {
  * @param {number} [topN=10]
  * @returns {Array}
  */
-function rankByComm(txs, topN) {
+var rankByComm = _memoStats(function(txs, topN) {
   if (!topN) topN = 10;
   var agg = aggregateByAgent(txs);
   agg.sort(function(a, b) { return b.comm - a.comm; });
@@ -2551,49 +2584,60 @@ function rankByComm(txs, topN) {
     result[i].rank = i + 1;
   }
   return result;
-}
+}, 'rankByComm');
 
 /**
  * 地点按洗码量排名
  * @param {Array} txs
  * @returns {Array}
  */
-function rankVenueByVolume(txs) {
+var rankVenueByVolume = _memoStats(function(txs) {
   var agg = aggregateByVenue(txs);
   agg.sort(function(a, b) { return b.volume - a.volume; });
   for (var i = 0; i < agg.length; i++) {
     agg[i].rank = i + 1;
   }
   return agg;
-}
+}, 'rankVenueByVolume');
 
 // ============================================================================
-// KPI 汇总
+// KPI 汇总 (单趟遍历优化)
 // ============================================================================
 
 /**
- * 计算 KPI 摘要 (对照档总览页 KPI 卡片)
+ * 计算 KPI 摘要 (单趟遍历，对照档总览页 KPI 卡片)
  * @param {Array} txs
  * @returns {object} { totalVolume, totalComm, totalBonus, totalFund, totalDrawn, totalUndrawn, totalCash, txCount, agentCount }
  */
-function calcKPI(txs) {
+var calcKPI = _memoStats(function(txs) {
   var agents = {};
+  var totalVolume = 0, totalComm = 0, totalBonus = 0, totalFund = 0;
+  var totalDrawn = 0, totalUndrawn = 0, totalCash = 0;
+
   for (var i = 0; i < txs.length; i++) {
-    if (txs[i].agent) agents[txs[i].agent] = true;
+    var tx = txs[i];
+    if (tx.agent) agents[tx.agent] = true;
+    totalVolume  += toNum(tx.volume);
+    totalComm    += toNum(tx.comm);
+    totalBonus   += toNum(tx.bonus);
+    totalFund    += toNum(tx.fund);
+    totalDrawn   += toNum(tx.drawn);
+    totalUndrawn += toNum(tx.undrawn);
+    totalCash    += toNum(tx.cash) || 0;
   }
 
   return {
-    totalVolume:  totalVolume(txs),
-    totalComm:    totalComm(txs),
-    totalBonus:   totalBonus(txs),
-    totalFund:    totalFund(txs),
-    totalDrawn:   totalDrawn(txs),
-    totalUndrawn: totalUndrawn(txs),
-    totalCash:    totalCash(txs),
+    totalVolume:  totalVolume,
+    totalComm:    totalComm,
+    totalBonus:   totalBonus,
+    totalFund:    totalFund,
+    totalDrawn:   totalDrawn,
+    totalUndrawn: totalUndrawn,
+    totalCash:    totalCash,
     txCount:      txs.length,
     agentCount:   Object.keys(agents).length,
   };
-}
+}, 'calcKPI');
 
 // ============================================================================
 // 订房统计
@@ -2604,7 +2648,7 @@ function calcKPI(txs) {
  * @param {Array} bookings
  * @returns {Array} [{ month, count, totalCost, totalNights }]
  */
-function aggregateBookingsByMonth(bookings) {
+var aggregateBookingsByMonth = _memoStats(function(bookings) {
   var map = {};
   for (var i = 0; i < bookings.length; i++) {
     var b = bookings[i];
@@ -2626,7 +2670,7 @@ function aggregateBookingsByMonth(bookings) {
   for (var key in map) { result.push(map[key]); }
   result.sort(function(a, b) { return a.month.localeCompare(b.month); });
   return result;
-}
+}, 'aggregateBookingsByMonth');
 
 // src/calc/filters.js
 /**
@@ -2852,6 +2896,12 @@ function sortTxs(txs, col, asc) {
   result.sort(function(a, b) {
     var va = a[col];
     var vb = b[col];
+    // type 列：binary categorical, cash=1, 其他=0（与 all.js 原始行为一致）
+    if (col === 'type') {
+      va = (va === 'cash') ? 1 : 0;
+      vb = (vb === 'cash') ? 1 : 0;
+      return (va - vb) * dir;
+    }
     if (numericCols[col]) {
       va = toNum(va);
       vb = toNum(vb);
@@ -2995,8 +3045,16 @@ function filterHCConfig(hcConfig, criteria) {
  * @returns {object} 新增的交易对象
  */
 function createTx(formData) {
-  var txs = State.get('txs');
   var month = State.get('workingMonth');
+
+  // ★ 关账守卫：已关账月份禁止新增交易
+  if (isMonthLocked(month)) {
+    console.warn('[v13:tx] ⛔ createTx 被阻止：月份 ' + month + ' 已关账');
+    if (typeof showToast === 'function') showToast('该月份已关账，禁止新增交易', 'warning');
+    return null;
+  }
+
+  var txs = State.get('txs');
 
   // 计算金额
   var vol = toNum(formData.volume);
@@ -3058,6 +3116,21 @@ function createTx(formData) {
  * @returns {object|null} 更新后的交易对象，找不到返回 null
  */
 function updateTx(fbKey, formData) {
+  // ★ 关账守卫：先查交易的月份
+  var txsAll = State.get('txs');
+  var targetTx = null;
+  for (var fi = 0; fi < txsAll.length; fi++) {
+    if (txsAll[fi]._fbKey === fbKey) { targetTx = txsAll[fi]; break; }
+  }
+  if (targetTx) {
+    var txMonth = (targetTx.date || '').substring(0, 7);
+    if (isMonthLocked(txMonth)) {
+      console.warn('[v13:tx] ⛔ updateTx 被阻止：交易所属月份 ' + txMonth + ' 已关账');
+      if (typeof showToast === 'function') showToast('该交易所属月份已关账，禁止编辑', 'warning');
+      return null;
+    }
+  }
+
   var txs = State.get('txs');
   var updated = null;
 
@@ -3117,6 +3190,22 @@ function updateTx(fbKey, formData) {
  */
 function deleteTx(fbKey) {
   console.log('[v13:tx] 🔵 deleteTx ENTERED, fbKey=' + fbKey + ', 當前 txs 數量=' + State.get('txs').length);
+
+  // ★ 关账守卫：先查交易的月份
+  var txsAll = State.get('txs');
+  var targetTx = null;
+  for (var fi = 0; fi < txsAll.length; fi++) {
+    if (txsAll[fi]._fbKey === fbKey) { targetTx = txsAll[fi]; break; }
+  }
+  if (targetTx) {
+    var txMonth = (targetTx.date || '').substring(0, 7);
+    if (isMonthLocked(txMonth)) {
+      console.warn('[v13:tx] ⛔ deleteTx 被阻止：交易所属月份 ' + txMonth + ' 已关账');
+      if (typeof showToast === 'function') showToast('该交易所属月份已关账，禁止删除', 'warning');
+      return null;
+    }
+  }
+
   var deleted = null;
 
   State.update('txs', function(arr) {
@@ -3228,6 +3317,17 @@ function sortTable(tableId, colName) {
 // ============================================================================
 
 /**
+ * 检查指定月份是否已关账
+ * @param {string} month - "YYYY-MM"
+ * @returns {boolean}
+ */
+function isMonthLocked(month) {
+  if (!month) return false;
+  var lockedMonths = State.get('lockedMonths') || {};
+  return !!lockedMonths[month];
+}
+
+/**
  * 月末结算：锁定当月
  * 将当月交易打包到 archives，然后不再允许当月交易
  * @returns {object} { success, month, txCount }
@@ -3236,6 +3336,11 @@ function closeCurrentMonth() {
   var month = State.get('workingMonth');
   if (!month) {
     return { success: false, error: '无效的工作月份' };
+  }
+
+  // ★ 防止重复关账
+  if (isMonthLocked(month)) {
+    return { success: false, error: '该月已关账，无需重复操作' };
   }
 
   var monthTxs = getTxsForMonth(month);
@@ -3252,7 +3357,13 @@ function closeCurrentMonth() {
   State.set('archives', archives);
   Store.saveArchives(archives);
 
-  // 锁定
+  // ★ 锁定当前月份（改为记录已锁定月份集合）
+  var lockedMonths = State.get('lockedMonths') || {};
+  lockedMonths[month] = true;
+  State.set('lockedMonths', lockedMonths);
+  localStorage.setItem('MACAU_LOCKED_MONTHS', JSON.stringify(lockedMonths));
+
+  // ★ 也设置 isLocked 向后兼容
   State.set('isLocked', true);
 
   // 通知事件
@@ -4541,6 +4652,87 @@ function importFromBackupExport(exportData, targetDate) {
 }
 
 /**
+ * 导出当前全部数据为 JSON 文件并下载
+ */
+function exportJSONBackup() {
+  var dateStr = nowStr();
+  var exportData = {
+    appVersion:    APP.VERSION,
+    exportDate:    dateStr,
+    systemName:    APP.SYSTEM_NAME,
+    txs:           State.get('txs') || [],
+    fundWithdrawals: State.get('fundWithdrawals') || [],
+    agentWallets:  State.get('agentWallets') || {},
+    agentList:     State.get('agentList') || [],
+    bookings:      State.get('bookings') || [],
+    hotelConfig:   State.get('hotelConfig') || [],
+    archives:      State.get('archives') || {},
+    workingMonth:  State.get('workingMonth') || '',
+  };
+
+  var json = JSON.stringify(exportData, null, 2);
+  var blob = new Blob([json], { type: 'application/json;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'macau_backup_' + dateStr + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  showToast('JSON 備份已下載 (macau_backup_' + dateStr + '.json)', 'success');
+  return exportData;
+}
+
+/**
+ * 从 JSON 文件导入备份
+ * 由文件选择 input 触发
+ * @param {File} file
+ */
+function importJSONBackup(file) {
+  if (!file) {
+    showToast('請選擇備份檔案', 'warning');
+    return;
+  }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var data = JSON.parse(e.target.result);
+      if (!data.appVersion && !data.txs && !data.exportDate) {
+        showToast('無效的備份檔案格式', 'error');
+        return;
+      }
+      // 确认导入
+      if (!confirm('確定要從 JSON 備份還原？\n\n備份日期: ' + (data.exportDate || '未知') + '\n交易數: ' + ((data.txs || []).length) + '\n\n⚠️ 當前數據將被替換！')) {
+        return;
+      }
+      // 批量恢复
+      State.batchSet({
+        txs:              data.txs || [],
+        fundWithdrawals:  data.fundWithdrawals || [],
+        agentWallets:     data.agentWallets || {},
+        agentList:        data.agentList || [],
+        bookings:         data.bookings || [],
+        hotelConfig:      data.hotelConfig || [],
+        archives:         data.archives || {},
+        workingMonth:     data.workingMonth || '',
+      });
+      Store.saveAll();
+      Events.emit(EVENTS.TXS_LOADED, State.get('txs'));
+      Events.emit(EVENTS.BOOKINGS_LOADED, State.get('bookings'));
+      showToast('備份還原成功！ (交易: ' + (data.txs || []).length + ' 筆)', 'success');
+      // 刷新当前页面
+      if (typeof renderCurrentPage === 'function') renderCurrentPage();
+    } catch (err) {
+      console.error('[v13:backup] importJSONBackup error:', err);
+      showToast('匯入失敗: ' + (err.message || err), 'error');
+    }
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
+/**
  * 每日自动备份检查
  */
 function autoBackupCheck() {
@@ -5102,11 +5294,17 @@ function _watchConnection() {
 
     if (connected) {
       console.log('[v13:firebase] ✅ Firebase RTDB 已連線');
-      // 安全网：2 秒后推送本地数据到 Firebase（transaction 合并，幂等）
+      // 重连双向同步：先拉取远端数据，再推送本地变更
       setTimeout(function() {
         if (!State.get('syncConnected')) return;
-        console.log('[v13:firebase] 🔄 安全網推送...');
-        try { syncUploadAll(); } catch(e) { console.error('[v13:firebase] syncUploadAll error:', e); }
+        console.log('[v13:firebase] 🔄 重連同步：下載遠端...');
+        try { syncDownloadAll(); } catch(e) { console.error('[v13:firebase] syncDownloadAll error:', e); }
+        // 等下载合并完成后，再推送本地数据
+        setTimeout(function() {
+          if (!State.get('syncConnected')) return;
+          console.log('[v13:firebase] 🔄 重連同步：推送本地...');
+          try { syncUploadAll(); } catch(e) { console.error('[v13:firebase] syncUploadAll error:', e); }
+        }, 3000);
       }, 2000);
     } else {
       // 只有从 connected→disconnected 变化时才警告（避免首次 false 状态误报）
@@ -5589,17 +5787,65 @@ function clearFirebaseData(onDone) {
  */
 
 // ============================================================================
+// 墓碑清理 (30 天 TTL)
+// ============================================================================
+
+/**
+ * 从数组中清理过期墓碑（_deleted:true 且超过 TTL）
+ * 在 transaction 写回 Firebase 前调用，防止墓碑永久累积
+ * @param {Array} arr - 含墓碑的数组
+ * @param {number} [ttlMs] - 墓碑 TTL 毫秒数，默认 CONFIG.TOMBSTONE_TTL_MS
+ * @returns {Array} 清理后的数组
+ */
+function _cleanOldTombstones(arr, ttlMs) {
+  if (!ttlMs) ttlMs = CONFIG.TOMBSTONE_TTL_MS;
+  if (!Array.isArray(arr) || arr.length === 0) return arr;
+  var now = Date.now();
+  var before = arr.length;
+  var cleaned = [];
+  for (var i = 0; i < arr.length; i++) {
+    var item = arr[i];
+    // 非墓碑 → 保留
+    if (!item._deleted) {
+      cleaned.push(item);
+      continue;
+    }
+    // 墓碑未超期 → 保留（其他设备可能还没同步）
+    var age = now - (item._updatedAt || 0);
+    if (age < ttlMs) {
+      cleaned.push(item);
+      continue;
+    }
+    // 过期墓碑 → 丢弃（不写回 Firebase）
+  }
+  if (before !== cleaned.length) {
+    console.log('[v13:uploader] 🪦 Cleaned ' + (before - cleaned.length) + ' expired tombstones (TTL=' + Math.round(ttlMs / 86400000) + 'd), kept ' + (cleaned.length - (arr.length - before)) + ' active tombstones');
+  }
+  return cleaned;
+}
+
+// ============================================================================
 // 上传队列
 // ============================================================================
 
 var _uploadQueue = [];
 var _uploading = false;
+var MAX_QUEUE_SIZE = 200;
 
 /**
  * 入队上传任务
  * @param {function} task - 返回 Promise 的上传函数
  */
 function enqueueUpload(task) {
+  // 队列溢出保护：超过上限时清空队列，替换为一次全量同步
+  if (_uploadQueue.length >= MAX_QUEUE_SIZE) {
+    console.warn('[v13:uploader] Queue overflow (' + _uploadQueue.length + ' pending), flushing → full sync');
+    _uploadQueue = [syncUploadAll];
+    if (!_uploading) {
+      _processQueue();
+    }
+    return;
+  }
   _uploadQueue.push(task);
   if (!_uploading) {
     _processQueue();
@@ -5670,6 +5916,8 @@ function syncUploadAll() {
       }
     }
     var merged = mergeTxs(txs, rArr);  // ✓ local=txs, remote=rArr
+    // ★ 清理 30 天前的过期墓碑
+    merged = _cleanOldTombstones(merged);
     console.log('[v13:uploader] TXS transaction: local=' + txs.length + ' remote=' + rArr.length + ' merged=' + merged.length);
     return fbArrayToObj(merged);
   }, function(err, committed, snapshot) {
@@ -5691,6 +5939,8 @@ function syncUploadAll() {
       }
     }
     var merged = mergeTxs(fundWithdrawals, rArr);
+    // ★ 清理 30 天前的过期墓碑
+    merged = _cleanOldTombstones(merged);
     console.log('[v13:uploader] FUND transaction: local=' + fundWithdrawals.length + ' remote=' + rArr.length + ' merged=' + merged.length);
     return fbArrayToObj(merged);
   }, function(err, committed, snapshot) {
@@ -5758,7 +6008,14 @@ function syncUploadAll() {
         }
       }
     }
-    return fbWalletsToObj(mergeWallets(agentWallets, rw));
+    var mergedWallets = mergeWallets(agentWallets, rw);
+    // ★ 清理每个代理下的过期墓碑
+    var cleanedWallets = {};
+    for (var cwAg in mergedWallets) {
+      var cleanedRecords = _cleanOldTombstones(mergedWallets[cwAg] || []);
+      if (cleanedRecords.length > 0) cleanedWallets[cwAg] = cleanedRecords;
+    }
+    return fbWalletsToObj(cleanedWallets);
   }, function(err, committed, snapshot) {
     if (err) {
       console.error('[v13:uploader] WALLETS transaction FAILED:', err.message || err);
@@ -5781,6 +6038,8 @@ function syncUploadAll() {
       }
     }
     var merged = mergeBookings(bookings, rArr);
+    // ★ 清理 30 天前的过期墓碑
+    merged = _cleanOldTombstones(merged);
     console.log('[v13:uploader] BOOKINGS transaction: local=' + bookings.length + ' remote=' + rArr.length + ' merged=' + merged.length);
     return fbArrayToObj(merged);
   }, function(err, committed, snapshot) {
@@ -5803,6 +6062,8 @@ function syncUploadAll() {
       }
     }
     var merged = mergeTxs(hcConfig, rArr);
+    // ★ 清理 30 天前的过期墓碑
+    merged = _cleanOldTombstones(merged);
     console.log('[v13:uploader] HC_CONFIG transaction: local=' + hcConfig.length + ' remote=' + rArr.length + ' merged=' + merged.length);
     return fbArrayToObj(merged);
   }, function(err, committed, snapshot) {
@@ -7156,14 +7417,14 @@ function autoLogin() {
   // 检查 sessionStorage
   if (sessionStorage.getItem('macau_auth') === '1') {
     hidePasswordOverlay();
-    setSessionPw(atob(APP.PWD_ENCODED));
+    setSessionPw(APP.PWD_HASH);
     startSessionTimer();
     return true;
   }
   // 检查 localStorage
   if (Store.loadAuth() === '1') {
     hidePasswordOverlay();
-    setSessionPw(atob(APP.PWD_ENCODED));
+    setSessionPw(APP.PWD_HASH);
     sessionStorage.setItem('macau_auth', '1');
     startSessionTimer();
     return true;
@@ -7217,7 +7478,11 @@ function isRemoteAccess() {
  *        calc/stats.js (calcKPI, rankByVolume, aggregateByDay)
  *        utils/format.js (fmt, fmtMoney), utils/dom.js ($, h)
  * 对照档: 第七节模块15
+ * 
+ * 命名空间: 仅导出 window.renderOverview
  */
+
+(function() {
 
 function renderOverview() {
   console.log('[v13:overview] renderOverview() called, txs count:', (State.get('txs') || []).length);
@@ -7300,14 +7565,6 @@ function _renderKPI(kpi) {
   info.textContent = '共 ' + kpi.txCount + ' 筆交易 · ' + kpi.agentCount + ' 位代理';
   grid.appendChild(info);
 
-  // ★ countUp 动画
-  var vals = grid.querySelectorAll('.kpi-card-value');
-  for (var j = 0; j < vals.length; j++) {
-    var v = vals[j];
-    if (v._cuRaw != null && typeof countUp === 'function') {
-      countUp(v, v._cuRaw, v._cuOpts);
-    }
-  }
 }
 
 function _renderRecentActivity(txs) {
@@ -7344,6 +7601,11 @@ function _renderRecentActivity(txs) {
   }
 }
 
+// 导出公开 API
+window.renderOverview = renderOverview;
+
+})();
+
 // src/pages/all.js
 /**
  * v13 全部交易页渲染
@@ -7351,7 +7613,11 @@ function _renderRecentActivity(txs) {
  * 依赖: core/state.js, calc/filters.js (filterByMonth, sortTxs)
  *        utils/format.js (fmt, fmtMoney, toNum), utils/dom.js ($, h)
  * 对照档: 第七节模块14
+ * 
+ * 命名空间: 仅导出 renderAll / _allGoToPage（分页 HTML onclick 需全局），其余内部变量私有化
  */
+
+(function() {
 
 // 表格排序状态
 var _allSortCol = 'date';   // 默认按日期排序
@@ -7362,6 +7628,7 @@ var _allTableSortInited = false;
 var _allSearchQuery = '';
 var _allCurrentPage = 1;
 var _allPageSize = 50;  // 每页显示笔数
+var _allLastRenderedKey = '';  // 快取最後渲染資料的特徵值，避免重複重建 DOM
 
 /** 初始化全部交易表排序表头点击 */
 function _initAllTableSort() {
@@ -7388,33 +7655,6 @@ function _initAllTableSort() {
       });
     })(ths[i]);
   }
-}
-
-/** 对交易数组按指定列排序 */
-function _sortTxs(txs, col, dir) {
-  var fn = function(a, b) {
-    var va, vb;
-    switch (col) {
-      case 'type':    va = (a.type === 'cash') ? 1 : 0; vb = (b.type === 'cash') ? 1 : 0; break;
-      case 'date':    va = a.date || ''; vb = b.date || ''; break;
-      case 'agent':   va = a.agent || ''; vb = b.agent || ''; break;
-      case 'client':  va = a.client || ''; vb = b.client || ''; break;
-      case 'venue':   va = a.venue || ''; vb = b.venue || ''; break;
-      case 'volume':  va = toNum(a.volume); vb = toNum(b.volume); break;
-      case 'comm':    va = toNum(a.comm); vb = toNum(b.comm); break;
-      case 'bonus':   va = toNum(a.bonus); vb = toNum(b.bonus); break;
-      case 'drawn':   va = toNum(a.drawn); vb = toNum(b.drawn); break;
-      case 'undrawn': va = toNum(a.undrawn); vb = toNum(b.undrawn); break;
-      default: return 0;
-    }
-    if (va < vb) return -1;
-    if (va > vb) return 1;
-    return 0;
-  };
-  var sorted = txs.slice();
-  sorted.sort(fn);
-  if (dir === 'desc') sorted.reverse();
-  return sorted;
 }
 
 /** ★ 搜索过滤交易 */
@@ -7465,7 +7705,7 @@ function renderAll() {
 
   // ★ 应用排序
   if (_allSortCol) {
-    try { txs = _sortTxs(txs, _allSortCol, _allSortDir); } catch (e) { console.error('[v13:all] sort 崩溃:', e); }
+    try { txs = sortTxs(txs, _allSortCol, _allSortDir === 'asc'); } catch (e) { console.error('[v13:all] sort 崩溃:', e); }
   }
 
   try {
@@ -7527,7 +7767,7 @@ function _renderAllTable(txs) {
   if (!tbody) return;
 
   var msg = $('#all-msg');
-  
+
   // ★ 分页
   var totalRows = txs.length;
   var totalPages = Math.ceil(totalRows / _allPageSize) || 1;
@@ -7535,7 +7775,16 @@ function _renderAllTable(txs) {
   var startIdx = (_allCurrentPage - 1) * _allPageSize;
   var endIdx = Math.min(startIdx + _allPageSize, totalRows);
   var pageTxs = txs.slice(startIdx, endIdx);
-  
+
+  // ★ 建立特徵值：排序欄位+方向+搜索詞+頁碼+所有 fx._fbKey 串聯
+  var keys = '';
+  for (var ki = 0; ki < pageTxs.length; ki++) {
+    if (pageTxs[ki]) keys += (pageTxs[ki]._fbKey || '') + '|';
+  }
+  var renderKey = _allSortCol + ':' + _allSortDir + ':' + _allSearchQuery + ':' + _allCurrentPage + ':' + keys;
+  if (renderKey === _allLastRenderedKey) return;  // 資料完全相同，跳過 DOM 重建
+  _allLastRenderedKey = renderKey;
+
   if (totalRows === 0) {
     tbody.innerHTML = '';
     if (msg) msg.style.display = 'block';
@@ -7543,7 +7792,8 @@ function _renderAllTable(txs) {
   }
   if (msg) msg.style.display = 'none';
 
-  tbody.innerHTML = '';
+  // ★ 使用 DocumentFragment 批量插入，避免每次 appendChild 觸發 reflow
+  var frag = document.createDocumentFragment();
   for (var i = 0; i < pageTxs.length; i++) {
     // ★ 防御：跳过 undefined 的墓碑条目
     if (!pageTxs[i]) continue;
@@ -7615,9 +7865,13 @@ function _renderAllTable(txs) {
       tdBtn.appendChild(delBtn);
       tr.appendChild(tdBtn);
 
-      tbody.appendChild(tr);
+      frag.appendChild(tr);  // 加入 Fragment（不觸發 reflow）
     })(pageTxs[i]);
   }
+
+  // ★ 一次性清空並插入（僅觸發 1 次 reflow）
+  while (tbody.firstChild) { tbody.removeChild(tbody.firstChild); }
+  tbody.appendChild(frag);
 }
 
 /** ★ 渲染分页控件 */
@@ -7686,12 +7940,22 @@ function _allGoToPage(page) {
   if (table) table.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// 导出公开 API — 仅 renderAll（refreshAllViews 调用）与 _allGoToPage（分页 HTML onclick 生成）
+window.renderAll = renderAll;
+window._allGoToPage = _allGoToPage;
+
+})();
+
 // src/pages/query.js
 /**
  * v13 查询页渲染
  * 依赖: core/state.js, calc/filters.js (filterTxs, sortTxs), utils/format.js, utils/dom.js ($)
  * 对照档: 第七节模块13 + v12 query.js
+ * 
+ * 命名空间: 仅导出 renderQuery / doQuery / saveCurrentFilter / loadSavedFilter / deleteSavedFilter / quickFilter
  */
+
+(function() {
 
 // 查询表排序状态
 var _querySortCol = 'date';   // 默认按日期排序
@@ -7724,35 +7988,13 @@ function _initQueryTableSort() {
   }
 }
 
-/** 对查询结果按指定列排序 */
-function _sortQueryResults(txs, col, dir) {
-  var fn = function(a, b) {
-    var va, vb;
-    switch (col) {
-      case 'date':    va = a.date || ''; vb = b.date || ''; break;
-      case 'agent':   va = a.agent || ''; vb = b.agent || ''; break;
-      case 'venue':   va = a.venue || ''; vb = b.venue || ''; break;
-      case 'volume':  va = toNum(a.volume); vb = toNum(b.volume); break;
-      case 'bonus':   va = toNum(a.bonus); vb = toNum(b.bonus); break;
-      case 'drawn':   va = toNum(a.drawn); vb = toNum(b.drawn); break;
-      case 'undrawn': va = toNum(a.undrawn); vb = toNum(b.undrawn); break;
-      default: return 0;
-    }
-    if (va < vb) return -1;
-    if (va > vb) return 1;
-    return 0;
-  };
-  var sorted = txs.slice();
-  sorted.sort(fn);
-  if (dir === 'desc') sorted.reverse();
-  return sorted;
-}
-
 /** 入口：弹出所有下拉并执行默认查询（本月） */
 function renderQuery() {
   _populateQueryFilters();
   _setDefaultMonth();
   _highlightQuickBtn('thisMonth');
+  // ★ 初始化已存筛选器
+  _initSavedFilters();
   // ★ 初始化查询表排序
   if (!_queryTableSortInited) { _initQueryTableSort(); _queryTableSortInited = true; }
   doQuery();
@@ -7960,7 +8202,7 @@ function doQuery() {
 
     // ★ 应用表格排序
     if (_querySortCol) {
-      try { filtered = _sortQueryResults(filtered, _querySortCol, _querySortDir); } catch(e) { console.error('[doQuery] sort 崩溃:', e); }
+      try { filtered = sortTxs(filtered, _querySortCol, _querySortDir === 'asc'); } catch(e) { console.error('[doQuery] sort 崩溃:', e); }
     }
 
     // 获取选定的月份（用于 pre-balance 和月份过滤）
@@ -8670,12 +8912,174 @@ function pad2(n) {
   return n < 10 ? '0' + n : '' + n;
 }
 
+// ============================================================================
+// 已存筛选器
+// ============================================================================
+
+/**
+ * 获取当前筛选条件快照
+ * @returns {object}
+ */
+function _getCurrentFilterSnapshot() {
+  return {
+    agent:    ($('#query-agent') || {}).value || '',
+    venue:    ($('#query-venue') || {}).value || '',
+    month:    ($('#query-month') || {}).value || '',
+    search:   ($('#query-search') || {}).value || '',
+    dateFrom: ($('#query-date-from') || {}).value || '',
+    dateTo:   ($('#query-date-to') || {}).value || '',
+    _savedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * 应用筛选器快照
+ * @param {object} snap
+ */
+function _applyFilterSnapshot(snap) {
+  var agentEl = $('#query-agent');
+  var venueEl = $('#query-venue');
+  var monthEl = $('#query-month');
+  var searchEl = $('#query-search');
+  var fromEl = $('#query-date-from');
+  var toEl = $('#query-date-to');
+  var customRange = $('#query-date-range');
+
+  if (agentEl) agentEl.value = snap.agent || '';
+  if (venueEl) venueEl.value = snap.venue || '';
+  if (monthEl) monthEl.value = snap.month || '';
+  if (searchEl) searchEl.value = snap.search || '';
+  if (fromEl) fromEl.value = snap.dateFrom || '';
+  if (toEl) toEl.value = snap.dateTo || '';
+
+  // 有自定义日期时展开日期范围
+  if (customRange && (snap.dateFrom || snap.dateTo)) {
+    customRange.style.display = '';
+  }
+
+  doQuery();
+}
+
+/**
+ * 刷新已存筛选器下拉列表
+ */
+function _refreshSavedFilterDropdown(selectName) {
+  var sel = $('#query-saved-filters');
+  if (!sel) return;
+
+  var filters = State.get('savedFilters') || {};
+  var names = Object.keys(filters).sort();
+
+  sel.innerHTML = '';
+  if (names.length === 0) {
+    sel.innerHTML = '<option value="">(無已存篩選)</option>';
+    sel.disabled = true;
+    return;
+  }
+
+  sel.disabled = false;
+  sel.innerHTML = '<option value="">— 選擇已存篩選 —</option>';
+  for (var i = 0; i < names.length; i++) {
+    var opt = document.createElement('option');
+    opt.value = names[i];
+    opt.textContent = names[i] + ' (' + (filters[names[i]].agent || '全部') + ')';
+    if (selectName === names[i]) opt.selected = true;
+    sel.appendChild(opt);
+  }
+}
+
+/**
+ * 儲存目前篩選條件
+ */
+function saveCurrentFilter() {
+  var snap = _getCurrentFilterSnapshot();
+
+  // 检查是否有实际筛选条件
+  if (!snap.agent && !snap.venue && !snap.month && !snap.search && !snap.dateFrom && !snap.dateTo) {
+    if (typeof showToast === 'function') showToast('目前無篩選條件可儲存', 'warning');
+    return;
+  }
+
+  // 用代理+月份作为默认名称
+  var defaultName = (snap.agent || '全部') + ' - ' + (snap.month || snap.dateFrom || '自訂');
+  var name = prompt('為此篩選器命名：', defaultName);
+  if (!name) return;
+  name = name.trim();
+  if (!name) return;
+
+  var filters = State.get('savedFilters') || {};
+  filters[name] = snap;
+  State.set('savedFilters', filters);
+  Store.saveFilters(filters);
+
+  _refreshSavedFilterDropdown(name);
+  if (typeof showToast === 'function') showToast('篩選器「' + name + '」已儲存', 'success');
+}
+
+/**
+ * 載入已存篩選
+ * @param {string} name
+ */
+function loadSavedFilter(name) {
+  if (!name) return;
+  var filters = State.get('savedFilters') || {};
+  var snap = filters[name];
+  if (!snap) {
+    if (typeof showToast === 'function') showToast('篩選器不存在', 'warning');
+    return;
+  }
+  _applyFilterSnapshot(snap);
+  if (typeof showToast === 'function') showToast('已載入篩選器「' + name + '」', 'info');
+}
+
+/**
+ * 刪除目前選中的已存篩選
+ */
+function deleteSavedFilter() {
+  var sel = $('#query-saved-filters');
+  if (!sel || !sel.value) {
+    if (typeof showToast === 'function') showToast('請先選擇要刪除的篩選器', 'warning');
+    return;
+  }
+  var name = sel.value;
+  if (!confirm('確定刪除篩選器「' + name + '」？')) return;
+
+  var filters = State.get('savedFilters') || {};
+  delete filters[name];
+  State.set('savedFilters', filters);
+  Store.saveFilters(filters);
+
+  _refreshSavedFilterDropdown();
+  if (typeof showToast === 'function') showToast('篩選器「' + name + '」已刪除', 'success');
+}
+
+/**
+ * 初始化已存筛选器下拉（页面渲染时调用）
+ */
+function _initSavedFilters() {
+  _refreshSavedFilterDropdown();
+}
+
+// 导出公开 API
+window.renderQuery = renderQuery;
+window.doQuery = doQuery;
+window.saveCurrentFilter = saveCurrentFilter;
+window.loadSavedFilter = loadSavedFilter;
+window.deleteSavedFilter = deleteSavedFilter;
+window.quickFilter = quickFilter;
+
+})();
+
 // src/pages/summary.js
 /**
  * v13 统计页渲染 (代理×场地聚合)
  * 依赖: calc/stats.js (aggregateByAgentVenue), utils/format.js
  * 对照档: 第七节模块10 renderSummary
+ * 
+ * 命名空间: 仅导出 window.renderSummary
  */
+
+(function() {
 
 function renderSummary() {
   var txs = State.get('txs');
@@ -8752,6 +9156,11 @@ function _renderSummaryTable(txs) {
     tbody.appendChild(tr);
   }
 }
+
+// 导出公开 API
+window.renderSummary = renderSummary;
+
+})();
 
 // src/pages/room.js
 /**
@@ -9266,7 +9675,11 @@ function rmImportCSV()       { RM.importCSV(); }
  *   - 快捷按钮设定 dateFrom/dateTo，存入 State
  *   - 各渲染函数从 State 读取范围进行筛选
  *   - 「全部時間」时 dateFrom='' && dateTo='' → 不过滤
+ * 
+ * 命名空间: 仅导出 window.renderWallet / window.walletQuickFilter
  */
+
+(function() {
 
 // ============================================================================
 // 快捷时间筛选器 (与查询页一致)
@@ -9894,6 +10307,12 @@ function _renderAgentWalletCards() {
   container.innerHTML = html;
 }
 
+// 导出公开 API
+window.renderWallet = renderWallet;
+window.walletQuickFilter = walletQuickFilter;
+
+})();
+
 // src/charts/trend.js
 /**
  * v13 图表模块 - 每日洗码量趋势
@@ -9901,6 +10320,7 @@ function _renderAgentWalletCards() {
  */
 
 var _trendChart = null;
+var _roomChart = null;
 
 /** 设置 Chart.js 全局 tooltip 暗色主题 */
 function _initChartDefaults() {
@@ -9933,7 +10353,7 @@ function renderTrendChart(txs, month) {
     if (!emptyEl) {
       chartContainer.insertAdjacentHTML('beforeend', '<div class="chart-empty"><svg class="empty-svg" viewBox="0 0 120 90" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted);opacity:0.35"><line x1="10" y1="80" x2="110" y2="80" stroke="currentColor" opacity="0.3"/><polyline points="20,80 35,50 50,65 65,30 80,45 95,20" stroke="currentColor" stroke-width="2" fill="none" opacity="0.4"/><circle cx="35" cy="50" r="3" fill="currentColor" opacity="0.4"/><circle cx="65" cy="30" r="3" fill="currentColor" opacity="0.4"/><circle cx="95" cy="20" r="3" fill="currentColor" opacity="0.4"/></svg><div class="empty-text">暫無趨勢數據</div><div class="empty-hint">新增交易後此處顯示每日洗碼量趨勢</div></div>');
     } else { emptyEl.style.display = ''; }
-    if (window._trendChart) { window._trendChart.destroy(); window._trendChart = null; }
+    if (_trendChart) { _trendChart.destroy(); _trendChart = null; }
     return;
   }
 
@@ -9949,9 +10369,9 @@ function renderTrendChart(txs, month) {
     volumes.push(data[i].volume);
   }
 
-  if (window._trendChart) window._trendChart.destroy();
+  if (_trendChart) _trendChart.destroy();
 
-  window._trendChart = new Chart(canvas, {
+  _trendChart = new Chart(canvas, {
     type: 'line',
     data: {
       labels: labels,
@@ -10000,8 +10420,73 @@ function renderTrendChart(txs, month) {
   });
 }
 
+function renderRoomChart(bookings, month) {
+  var canvas = document.querySelector('#page-room .rm-chart-wrap canvas');
+  if (!canvas) return;
+
+  var agg = aggregateBookingsByMonth(bookings);
+  if (month) agg = agg.filter(function(a) { return a.month === month; });
+
+  var labels = [];
+  var counts = [];
+  var freeCounts = [];
+  var paidCounts = [];
+
+  for (var i = 0; i < agg.length; i++) {
+    labels.push(agg[i].month);
+    counts.push(agg[i].count);
+    freeCounts.push(agg[i].freeCount);
+    paidCounts.push(agg[i].paidCount);
+  }
+
+  if (_roomChart) _roomChart.destroy();
+
+  _roomChart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: '免費',
+          data: freeCounts,
+          backgroundColor: UI_COLORS.success,
+          borderRadius: 4,
+        },
+        {
+          label: '付費',
+          data: paidCounts,
+          backgroundColor: UI_COLORS.warning,
+          borderRadius: 4,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { stacked: true, ticks: { color: UI_COLORS.textSecondary }, grid: { display: false } },
+        y: { stacked: true, ticks: { color: UI_COLORS.textSecondary }, grid: { color: UI_COLORS.borderSubtle } }
+      },
+      plugins: {
+        legend: {
+          labels: { color: UI_COLORS.textSecondary }
+        }
+      }
+    }
+  });
+}
+
+// src/charts/rank.js
+/**
+ * v13 图表模块 - 代理洗碼量排行柱状图
+ * 依赖: Chart.js CDN, calc/stats.js (rankByVolume), utils/format.js, charts/trend.js (_initChartDefaults)
+ */
+
+var _rankChart = null;
+
 function renderRankChart(txs) {
   if (typeof Chart === 'undefined') return;
+  if (typeof _initChartDefaults === 'function') _initChartDefaults();
   var canvas = document.querySelector('#page-overview .ov-two-col canvas');
   if (!canvas) return;
 
@@ -10009,14 +10494,14 @@ function renderRankChart(txs) {
   var chartContainer = canvas.parentElement;
   if (!chartContainer) return;
 
-  // ★ 无数据 → 显示空状态
+  // 无数据 → 显示空状态
   if (ranks.length === 0) {
     canvas.style.display = 'none';
     var emptyEl = chartContainer.querySelector('.chart-empty');
     if (!emptyEl) {
       chartContainer.insertAdjacentHTML('beforeend', '<div class="chart-empty"><svg class="empty-svg" viewBox="0 0 120 90" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted);opacity:0.35"><rect x="25" y="15" width="70" height="60" rx="6" stroke="currentColor" opacity="0.3"/><rect x="35" y="25" width="50" height="8" rx="2" fill="currentColor" opacity="0.2"/><rect x="35" y="38" width="40" height="8" rx="2" fill="currentColor" opacity="0.15"/><rect x="35" y="51" width="45" height="8" rx="2" fill="currentColor" opacity="0.1"/><circle cx="85" cy="29" r="3" fill="currentColor" opacity="0.3"/><circle cx="80" cy="42" r="3" fill="currentColor" opacity="0.25"/><circle cx="82" cy="55" r="3" fill="currentColor" opacity="0.2"/></svg><div class="empty-text">暫無排行數據</div><div class="empty-hint">新增交易後此處顯示代理洗碼量排行</div></div>');
     } else { emptyEl.style.display = ''; }
-    if (window._rankChart) { window._rankChart.destroy(); window._rankChart = null; }
+    if (_rankChart) { _rankChart.destroy(); _rankChart = null; }
     return;
   }
 
@@ -10039,9 +10524,9 @@ function renderRankChart(txs) {
     colors.push(palette[i] || UI_COLORS.techCyan);
   }
 
-  if (window._rankChart) window._rankChart.destroy();
+  if (_rankChart) _rankChart.destroy();
 
-  window._rankChart = new Chart(canvas, {
+  _rankChart = new Chart(canvas, {
     type: 'bar',
     data: {
       labels: labels,
@@ -10075,62 +10560,6 @@ function renderRankChart(txs) {
         y: {
           ticks: { color: UI_COLORS.textPrimary, font: { size: 12 } },
           grid: { display: false }
-        }
-      }
-    }
-  });
-}
-
-function renderRoomChart(bookings, month) {
-  var canvas = document.querySelector('#page-room .rm-chart-wrap canvas');
-  if (!canvas) return;
-
-  var agg = aggregateBookingsByMonth(bookings);
-  if (month) agg = agg.filter(function(a) { return a.month === month; });
-
-  var labels = [];
-  var counts = [];
-  var freeCounts = [];
-  var paidCounts = [];
-
-  for (var i = 0; i < agg.length; i++) {
-    labels.push(agg[i].month);
-    counts.push(agg[i].count);
-    freeCounts.push(agg[i].freeCount);
-    paidCounts.push(agg[i].paidCount);
-  }
-
-  if (window._roomChart) window._roomChart.destroy();
-
-  window._roomChart = new Chart(canvas, {
-    type: 'bar',
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          label: '免費',
-          data: freeCounts,
-          backgroundColor: UI_COLORS.success,
-          borderRadius: 4,
-        },
-        {
-          label: '付費',
-          data: paidCounts,
-          backgroundColor: UI_COLORS.warning,
-          borderRadius: 4,
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        x: { stacked: true, ticks: { color: UI_COLORS.textSecondary }, grid: { display: false } },
-        y: { stacked: true, ticks: { color: UI_COLORS.textSecondary }, grid: { color: UI_COLORS.borderSubtle } }
-      },
-      plugins: {
-        legend: {
-          labels: { color: UI_COLORS.textSecondary }
         }
       }
     }
@@ -10364,7 +10793,7 @@ function _populateTxAgentDropdown() {
     sel.appendChild(opt);
   }
   // 绑定代理选择联动 → 自动填入碼佣率
-  sel.onchange = _onAgentChange;
+  sel.onchange = onAgentChange;
 }
 
 /** 填充交易表单地点下拉 */
@@ -10390,7 +10819,7 @@ function _populateTxVenueDropdown() {
 }
 
 /** 代理选择变更 → 自动填入该代理最近交易的碼佣率 */
-function _onAgentChange() {
+function onAgentChange() {
   var agentSel = document.getElementById('tx-agent');
   var rateEl = document.getElementById('tx-rate');
   if (!agentSel || !rateEl) return;
@@ -11691,7 +12120,7 @@ function hcFilter() {
 /**
  * 登入按钮回调 — 读取密码调用 checkPassword，显示错误/剩余次数
  */
-function _v13LoginFallback() {
+function v13LoginFallback() {
   var inputEl = document.getElementById('pw-input');
   var errorEl = document.getElementById('pw-error');
   var attemptsEl = document.getElementById('pw-attempts');
@@ -11772,6 +12201,44 @@ Events.on(EVENTS.HC_CONFIG_UPDATED, function() {
     RM.populateCasinoDropdown();
   }
 });
+
+// ============================================================================
+// JSON 备份导出/导入
+// ============================================================================
+
+/**
+ * 导出 JSON 备份文件 (Bridge for onclick)
+ */
+function downloadJSONBackup() {
+  if (typeof exportJSONBackup === 'function') {
+    exportJSONBackup();
+  } else {
+    showToast('匯出功能不可用', 'error');
+  }
+}
+
+/**
+ * 触发 JSON 文件选择器进行导入
+ */
+function triggerJSONImport() {
+  var input = document.getElementById('json-import-input');
+  if (!input) {
+    input = document.createElement('input');
+    input.type = 'file';
+    input.id = 'json-import-input';
+    input.accept = '.json';
+    input.style.display = 'none';
+    input.addEventListener('change', function() {
+      var file = this.files[0];
+      if (file && typeof importJSONBackup === 'function') {
+        importJSONBackup(file);
+      }
+      this.value = ''; // 允许重复选择同一文件
+    });
+    document.body.appendChild(input);
+  }
+  input.click();
+}
 
 // src/app.js
 /**
@@ -11966,6 +12433,17 @@ Events.on(EVENTS.HC_CONFIG_UPDATED, function() {
 
     // ★ 周期性清理过期删除追踪 (每 30 秒)
     setInterval(function() { cleanRecentlyDeleted(); }, 30000);
+
+    // ★ 从 localStorage 恢复已关账月份
+    try {
+      var storedLocked = localStorage.getItem('MACAU_LOCKED_MONTHS');
+      if (storedLocked) {
+        var parsed = JSON.parse(storedLocked);
+        State.set('lockedMonths', parsed);
+        State.set('isLocked', Object.keys(parsed).length > 0);
+        console.log('[v13:app] 已关账月份:', Object.keys(parsed).join(', '));
+      }
+    } catch(e) { console.warn('[v13:app] lockedMonths restore error:', e); }
 
     // ★ 首先绑定交互: 先保侧栏能点、页面能切，再渲染数据
     _setupSidebar();
