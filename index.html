@@ -11,7 +11,7 @@
   <!-- 版本快取清除 -->
   <script>
     (function() {
-      var APP_VERSION = '13.0.3.1782372118545';
+      var APP_VERSION = '13.0.3.1782380612804';
       var stored = localStorage.getItem('macau_app_version');
       var qs = location.search || '';
       if (stored && stored !== APP_VERSION && !sessionStorage.getItem('_v13_reloaded')) {
@@ -293,11 +293,6 @@ a:focus-visible,
 .sb-logo-svg {
   display: block;
   margin: 0 auto 6px;
-  filter: drop-shadow(0 0 12px rgba(201,168,76,0.25));
-  transition: filter var(--trans-slow);
-}
-.sb-logo-svg:hover {
-  filter: drop-shadow(0 0 18px rgba(201,168,76,0.4));
 }
 .sb-logo-text { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 .sb-logo-name { font-size: 15px; font-weight: 700; color: var(--text-primary); letter-spacing: 2px; }
@@ -335,24 +330,11 @@ a:focus-visible,
   padding-left: 20px;
 }
 .sb-item.active {
-  background: linear-gradient(90deg, rgba(0,180,216,0.12) 0%, rgba(123,47,247,0.05) 100%);
+  background: rgba(0,212,255,0.06);
   color: var(--tech-cyan);
   border-left-color: var(--tech-cyan);
   font-weight: var(--fw-semibold);
-  box-shadow: inset 0 0 12px rgba(0,180,216,0.05);
   padding-left: 20px;
-}
-/* 选中态右侧金点 */
-.sb-item.active::after {
-  content: '';
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px; height: 4px;
-  border-radius: 50%;
-  background: var(--gold-soft);
-  opacity: 0.6;
 }
 /* 折叠模式 hover tooltip */
 #sidebar.collapsed .sb-item::before {
@@ -433,9 +415,9 @@ a:focus-visible,
 /* ── Topbar ── */
 #topbar {
   height: var(--topbar-h);
-  background: rgba(22,27,34,0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(22,27,34,0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border-subtle);
   box-shadow: 0 1px 4px rgba(0,0,0,0.15);
   display: flex;
@@ -474,6 +456,7 @@ a:focus-visible,
   padding: 20px;
   overflow-y: auto;
   scroll-behavior: smooth;
+  position: relative;
 }
 
 /* ── Section (页面内区块) ── */
@@ -2518,20 +2501,18 @@ input[type="range"]:focus {
   position: relative;
   overflow: hidden;
 }
-/* #59 云纹装饰 — 空状态下浮现淡墨云烟 */
+/* 空状态微网格背景 — 科技终端感 */
 .empty-state::before {
   content: '';
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.06;
-  background:
-    radial-gradient(ellipse 180px 40px at 20% 30%, var(--gold-soft), transparent),
-    radial-gradient(ellipse 200px 50px at 70% 40%, var(--sky-blue), transparent),
-    radial-gradient(ellipse 160px 35px at 50% 60%, var(--tech-cyan), transparent),
-    radial-gradient(ellipse 140px 30px at 30% 75%, var(--gold-soft), transparent),
-    radial-gradient(ellipse 170px 45px at 80% 70%, var(--sky-blue), transparent),
-    radial-gradient(ellipse 120px 28px at 15% 15%, var(--tech-cyan), transparent);
+  opacity: 0.025;
+  background-image:
+    radial-gradient(circle 0.5px, var(--tech-cyan), transparent),
+    radial-gradient(circle 0.5px, var(--tech-cyan), transparent);
+  background-size: 28px 28px;
+  background-position: 0 0, 14px 14px;
 }
 .empty-state .empty-icon {
   font-size: 48px;
@@ -2796,7 +2777,7 @@ input[type="range"]:focus {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: 4px;
-  color: var(--gold-soft);
+  color: var(--tech-cyan);
   line-height: 1.6;
   box-shadow: 0 1px 2px rgba(0,0,0,0.2);
 }
@@ -2821,89 +2802,30 @@ input[type="range"]:focus {
 
 /* css/china-theme.css */
 /* ============================================================================
- * v13 中国风主题 (隐性克制·30%)
+ * v13 科技主题 — 整洁前卫·专业克制
  *
- * 手法: 极淡山水线稿背景 (<1.5% 透明度)、窗棂线条、印章感、水墨点缀
- * 避免: 龙纹/祥云/牡丹/宫廷风/厚重发光/俗艳渐变
+ * 原则: 纯功能装饰、冷色系、无冗余宫廷元素
  * ============================================================================ */
 
 /* ═══════════════════════════════════════════════════════
- * 远山水墨背景
+ * 数据终端网格背景 (#15)
  * ═══════════════════════════════════════════════════════ */
 
-#app-shell::before {
+#page-scroll::before {
   content: '';
-  position: fixed;
+  position: absolute;
   inset: 0;
-  z-index: 0;
   pointer-events: none;
-  opacity: 0.025;
-  background:
-    /* 远山第一层 */
-    radial-gradient(ellipse 55% 28% at 18% 84%, rgba(201,168,76,0.03) 0%, transparent 70%),
-    radial-gradient(ellipse 48% 22% at 65% 87%, rgba(201,168,76,0.02) 0%, transparent 65%),
-    /* 远山第二层 */
-    radial-gradient(ellipse 40% 20% at 35% 90%, rgba(201,168,76,0.018) 0%, transparent 60%),
-    radial-gradient(ellipse 35% 18% at 80% 92%, rgba(201,168,76,0.015) 0%, transparent 55%),
-    /* 近景山脉 (新增) */
-    radial-gradient(ellipse 30% 14% at 12% 95%, rgba(201,168,76,0.025) 0%, transparent 50%),
-    radial-gradient(ellipse 25% 12% at 88% 96%, rgba(201,168,76,0.02) 0%, transparent 48%),
-    /* 云雾层 */
-    radial-gradient(ellipse 75% 12% at 50% 78%, rgba(255,255,255,0.01) 0%, transparent 55%),
-    radial-gradient(ellipse 60% 10% at 30% 82%, rgba(255,255,255,0.006) 0%, transparent 50%);
+  z-index: 0;
+  opacity: 0.018;
+  background-image:
+    radial-gradient(circle 1px at 0 0, var(--tech-cyan), transparent),
+    radial-gradient(circle 1px at 20px 20px, var(--tech-cyan), transparent);
+  background-size: 40px 40px;
 }
 
 /* ═══════════════════════════════════════════════════════
- * 窗棂几何装饰 — 侧栏 Hover
- * ═══════════════════════════════════════════════════════ */
-
-.sb-item::after {
-  content: '';
-  position: absolute;
-  right: 12px;
-  width: 20px;
-  height: 20px;
-  border: 1px solid rgba(201,168,76,0.15);
-  border-radius: 2px;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-.sb-item:hover::after {
-  opacity: 1;
-  animation: latticeReveal 0.4s ease forwards;
-}
-@keyframes latticeReveal {
-  0% { transform: rotate(0deg) scale(0.8); }
-  100% { transform: rotate(0deg) scale(1); }
-}
-.sb-item { position: relative; }
-
-/* ═══════════════════════════════════════════════════════
- * 印章感 — 登录画面
- * ═══════════════════════════════════════════════════════ */
-
-#pw-box::before {
-  content: '';
-  position: absolute;
-  top: 18px; right: 18px;
-  width: 26px; height: 26px;
-  border: 1.5px solid rgba(201,168,76,0.15);
-  border-radius: 3px;
-  transform: rotate(15deg);
-  opacity: 0.4;
-}
-#pw-box::after {
-  content: '印';
-  position: absolute;
-  top: 22px; right: 22px;
-  font-size: 14px;
-  color: rgba(201,168,76,0.15);
-  font-family: 'STKaiti', 'KaiTi', serif;
-  transform: rotate(15deg);
-}
-
-/* ═══════════════════════════════════════════════════════
- * 月度结算按钮 — 朱砂色
+ * 月度结算按钮 — 朱砂色 (功能保留)
  * ═══════════════════════════════════════════════════════ */
 
 #btn-close-month {
@@ -2918,7 +2840,7 @@ input[type="range"]:focus {
 }
 
 /* ═══════════════════════════════════════════════════════
- * 三甲标识 — 金/银/铜
+ * 三甲标识 — 金/银/铜 (功能保留)
  * ═══════════════════════════════════════════════════════ */
 
 tr.rank-1 td:first-child::before {
@@ -2938,61 +2860,32 @@ tr.rank-1 td {
 }
 
 /* ═══════════════════════════════════════════════════════
- * 装饰性分割线
+ * 装饰性分割线 (克制版)
  * ═══════════════════════════════════════════════════════ */
 
 .decorative-line {
   background: linear-gradient(90deg,
     transparent 0%,
-    rgba(201,168,76,0.06) 20%,
-    rgba(201,168,76,0.12) 50%,
-    rgba(201,168,76,0.06) 80%,
+    rgba(255,255,255,0.04) 30%,
+    rgba(255,255,255,0.08) 50%,
+    rgba(255,255,255,0.04) 70%,
     transparent 100%
   );
 }
 
 /* ═══════════════════════════════════════════════════════
- * 金边微光 — KPI 卡片悬浮
+ * KPI / Dash 卡片悬浮 — 科技冷光替代金边
  * ═══════════════════════════════════════════════════════ */
 
 .kpi-card:hover {
-  box-shadow: var(--shadow-md), 0 0 0 1px rgba(201,168,76,0.08);
+  box-shadow: var(--shadow-md), 0 0 0 1px rgba(0,212,255,0.08);
 }
 .dash-card:hover {
-  box-shadow: var(--shadow-sm), 0 0 0 1px rgba(201,168,76,0.06);
+  box-shadow: var(--shadow-sm), 0 0 0 1px rgba(0,212,255,0.06);
 }
 
 /* ═══════════════════════════════════════════════════════
- * 印章体版本号
- * ═══════════════════════════════════════════════════════ */
-
-#version-badge {
-  font-family: 'STKaiti', 'KaiTi', serif;
-  letter-spacing: 1.5px;
-}
-
-/* ═══════════════════════════════════════════════════════
- * 登录画面标题 — 楷体优先
- * ═══════════════════════════════════════════════════════ */
-
-.pw-title {
-  font-family: 'STKaiti', 'KaiTi', 'PingFang TC', serif;
-}
-.pw-emblem-text {
-  font-family: 'STKaiti', 'KaiTi', serif;
-}
-
-/* ═══════════════════════════════════════════════════════
- * 侧栏 Logo — 中式排版
- * ═══════════════════════════════════════════════════════ */
-
-.sb-logo-name {
-  font-family: 'STKaiti', 'KaiTi', 'PingFang TC', serif;
-  letter-spacing: 3px;
-}
-
-/* ═══════════════════════════════════════════════════════
- * 水墨笔触 — Modal 顶部装饰线
+ * Modal 标题装饰线 — 青色底划线 (保留)
  * ═══════════════════════════════════════════════════════ */
 
 .modal h3::after {
@@ -3006,59 +2899,7 @@ tr.rank-1 td {
 }
 
 /* ═══════════════════════════════════════════════════════
- * 金箔斑驳 — 侧栏 Logo 区域
- * ═══════════════════════════════════════════════════════ */
-
-.sb-logo {
-  position: relative;
-  overflow: hidden;
-}
-.sb-logo::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.04;
-  background:
-    radial-gradient(circle 8px at 30% 40%, rgba(201,168,76,0.4) 0%, transparent 100%),
-    radial-gradient(circle 5px at 70% 20%, rgba(201,168,76,0.3) 0%, transparent 100%),
-    radial-gradient(circle 6px at 45% 75%, rgba(212,175,55,0.25) 0%, transparent 100%),
-    radial-gradient(circle 3px at 85% 60%, rgba(201,168,76,0.2) 0%, transparent 100%);
-}
-
-/* ═══════════════════════════════════════════════════════
- * 金箔斑驳 — 页面标题分隔线
- * ═══════════════════════════════════════════════════════ */
-
-.section-header::before {
-  content: '';
-  position: absolute;
-  top: 0; left: -10px; right: -10px; height: 100%;
-  pointer-events: none;
-  opacity: 0.03;
-  background:
-    radial-gradient(circle 3px at 5% 50%, rgba(201,168,76,0.3) 0%, transparent 100%),
-    radial-gradient(circle 2px at 15% 30%, rgba(201,168,76,0.2) 0%, transparent 100%);
-}
-
-.content-card::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg,
-    transparent 0%,
-    rgba(201,168,76,0.08) 50%,
-    transparent 100%
-  );
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-.content-card:hover::before { opacity: 1; }
-.content-card { position: relative; overflow: hidden; }
-
-/* ═══════════════════════════════════════════════════════
- * 登录画面 — 浮动光点粒子动画
+ * 登录画面 — 冷色浮动粒子 (去金留青)
  * ═══════════════════════════════════════════════════════ */
 
 #pw-overlay::before {
@@ -3067,14 +2908,12 @@ tr.rank-1 td {
   top: -50%; left: -50%;
   width: 200%; height: 200%;
   background:
-    radial-gradient(2px 2px at 10% 20%, rgba(201,168,76,0.3) 0%, transparent 100%),
-    radial-gradient(2px 2px at 25% 65%, rgba(201,168,76,0.2) 0%, transparent 100%),
-    radial-gradient(1.5px 1.5px at 40% 40%, rgba(0,212,255,0.15) 0%, transparent 100%),
-    radial-gradient(2px 2px at 55% 80%, rgba(201,168,76,0.25) 0%, transparent 100%),
-    radial-gradient(1.5px 1.5px at 70% 15%, rgba(0,212,255,0.12) 0%, transparent 100%),
-    radial-gradient(2px 2px at 85% 55%, rgba(201,168,76,0.2) 0%, transparent 100%),
-    radial-gradient(1px 1px at 15% 85%, rgba(0,212,255,0.1) 0%, transparent 100%),
-    radial-gradient(1.5px 1.5px at 92% 30%, rgba(201,168,76,0.15) 0%, transparent 100%);
+    radial-gradient(1.5px 1.5px at 10% 20%, rgba(0,212,255,0.18) 0%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 25% 65%, rgba(0,149,255,0.14) 0%, transparent 100%),
+    radial-gradient(1px 1px at 40% 40%, rgba(0,212,255,0.12) 0%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 55% 80%, rgba(124,58,237,0.12) 0%, transparent 100%),
+    radial-gradient(1px 1px at 70% 15%, rgba(0,212,255,0.1) 0%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 85% 55%, rgba(0,149,255,0.12) 0%, transparent 100%);
   animation: floatParticles 20s linear infinite;
   pointer-events: none;
   z-index: 0;
@@ -3091,6 +2930,121 @@ tr.rank-1 td {
   position: relative;
   z-index: 1;
 }
+
+/* ═══════════════════════════════════════════════════════
+ * 侧栏选中态 — 简洁科技感 (去金点)
+ * ═══════════════════════════════════════════════════════ */
+
+.sb-item.active::after { display: none; }
+
+/* ═══════════════════════════════════════════════════════
+ * Logo 发光降级 — 从金色 glow 改为微青
+ * ═══════════════════════════════════════════════════════ */
+
+.sb-logo-svg {
+  filter: drop-shadow(0 0 8px rgba(0,212,255,0.15));
+  transition: filter var(--trans-slow);
+}
+.sb-logo-svg:hover {
+  filter: drop-shadow(0 0 14px rgba(0,212,255,0.25));
+}
+.pw-logo-svg {
+  filter: drop-shadow(0 0 10px rgba(0,212,255,0.2));
+  animation: pwLogoPulse 4s ease-in-out infinite;
+}
+@keyframes pwLogoPulse {
+  0%, 100% { filter: drop-shadow(0 0 10px rgba(0,212,255,0.2)); }
+  50% { filter: drop-shadow(0 0 18px rgba(0,212,255,0.4)); }
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 登录框 / 密码输入 — 科技冷色替代金色
+ * ═══════════════════════════════════════════════════════ */
+
+#pw-box {
+  border-color: rgba(255,255,255,0.1);
+}
+#pw-input:focus {
+  border-color: var(--tech-cyan);
+  box-shadow: 0 0 12px rgba(0,212,255,0.12);
+  background: var(--bg-elevated);
+}
+.pw-input-wrap:focus-within {
+  box-shadow: 0 0 0 2px rgba(0,212,255,0.1);
+  border-radius: var(--radius-sm);
+}
+#pw-input:focus ~ .pw-lock-icon,
+.pw-input-wrap:focus-within .pw-lock-icon {
+  color: var(--tech-cyan);
+}
+
+/* 登录按钮 — 科技渐变替代金色 */
+.pw-btn {
+  width: 100%; padding: 10px;
+  background: transparent;
+  color: var(--tech-cyan);
+  border: 1px solid rgba(0,212,255,0.2);
+  border-radius: var(--radius-sm);
+  font-size: 15px; font-weight: 600; cursor: pointer;
+  letter-spacing: 2px;
+  transition: all var(--trans-base);
+}
+.pw-btn:hover {
+  background: rgba(0,212,255,0.08);
+  color: #00e0ff;
+  border-color: var(--tech-cyan);
+  box-shadow: 0 0 14px rgba(0,212,255,0.15);
+}
+
+.pw-divider {
+  border-bottom-color: rgba(255,255,255,0.08);
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 全局字体恢复 — 移除楷体
+ * ═══════════════════════════════════════════════════════ */
+
+.pw-title,
+.pw-emblem-text,
+.sb-logo-name,
+#version-badge {
+  font-family: inherit;
+}
+
+.pw-emblem-text { color: var(--tech-cyan); letter-spacing: 2px; }
+
+/* ═══════════════════════════════════════════════════════
+ * 按钮 hover glow 克制化 (#14)
+ * ═══════════════════════════════════════════════════════ */
+
+.btn-primary:hover {
+  box-shadow: 0 0 10px rgba(0,212,255,0.18);
+}
+
+/* ═══════════════════════════════════════════════════════
+ * Section header — 移除金箔斑驳 (已在 layout 中用 ::after 做青色线)
+ * ═══════════════════════════════════════════════════════ */
+
+.section-header::before { display: none; }
+
+/* ═══════════════════════════════════════════════════════
+ * Content card hover — 青色微光替代金色线
+ * ═══════════════════════════════════════════════════════ */
+
+.content-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(0,212,255,0.06) 50%,
+    transparent 100%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.content-card:hover::before { opacity: 1; }
 
 /* css/mobile.css */
 /* ============================================================================
@@ -4041,7 +3995,7 @@ tr.rank-1 td {
   <!-- Firebase 初始化已统一由 src/sync/firebase.js 的 initFirebase() 处理（带重试） -->
 
   <!-- JS: 合并后由 build.js 输出为 app.js -->
-  <script src="app.js?v=13.0.3.1782372118545"></script>
+  <script src="app.js?v=13.0.3.1782380612804"></script>
 </head>
 <body>
 
@@ -4717,6 +4671,6 @@ tr.rank-1 td {
     })();
   </script>
 
-  <!-- BUILD: v13.0.3 | 2026-06-24 | 2026-06-25T07:21:58.545Z -->
+  <!-- BUILD: v13.0.3 | 2026-06-24 | 2026-06-25T09:43:32.804Z -->
 </body>
 </html>
