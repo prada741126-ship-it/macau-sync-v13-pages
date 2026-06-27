@@ -8748,7 +8748,7 @@ function _renderAgentLedger(agent, filteredTxs, queryMonth) {
       '\n  有 drawn>0: ' + hasDrawnCount + ' 筆 | drawn=0/空: ' + noDrawnCount + ' 筆' +
       '\n  bonusSum(碼糧)=   ' + allBonus +
       '\n  cashSum(現金寄放)= ' + allCash +
-      '\n  drawnSum(tx.drawn)= ' + drawnSum +
+      '\n  drawnSum(tx.drawn)= ' + (allDrawn - awWithdraw) +
       '\n  awDeposit(存入)=    ' + awDep +
       '\n  awCashDep(自存現金)= ' + awCDep +
       '\n  awWithdraw(提領)=   ' + awWithdraw +
