@@ -11,7 +11,7 @@
   <!-- 版本快取清除 -->
   <script>
     (function() {
-      var APP_VERSION = '13.0.3.1782382947297';
+      var APP_VERSION = '13.0.3.1782575161537';
       var stored = localStorage.getItem('macau_app_version');
       var qs = location.search || '';
       if (stored && stored !== APP_VERSION && !sessionStorage.getItem('_v13_reloaded')) {
@@ -2800,6 +2800,24 @@ input[type="range"]:focus {
   color: var(--tech-cyan);
 }
 
+/* ═══════════════════════════════════════════════════════
+ * 统计页合计行
+ * ═══════════════════════════════════════════════════════ */
+.summary-total-row {
+  border-top: 2px solid var(--border-subtle);
+  background: rgba(0,212,255,0.04);
+}
+.summary-total-row td {
+  font-weight: 700;
+  color: var(--text-primary);
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.summary-total-row td:first-child {
+  color: var(--gold-light);
+  letter-spacing: 1px;
+}
+
 /* css/china-theme.css */
 /* ============================================================================
  * v13 科技主题 v2 — 可见·凌厉·专业
@@ -4043,7 +4061,7 @@ tr.rank-1 td {
   <!-- Firebase 初始化已统一由 src/sync/firebase.js 的 initFirebase() 处理（带重试） -->
 
   <!-- JS: 合并后由 build.js 输出为 app.js -->
-  <script src="app.js?v=13.0.3.1782382947297"></script>
+  <script src="app.js?v=13.0.3.1782575161537"></script>
 </head>
 <body>
 
@@ -4333,7 +4351,7 @@ tr.rank-1 td {
           <div id="summary-kpi" class="kpi-grid"></div>
           <div class="table-scroll">
             <table id="summary-table">
-              <thead><tr><th>代理</th><th>場地</th><th class="text-right">洗碼量</th><th class="text-right">碼糧</th><th class="text-right">已提領</th><th class="text-right">未提領</th></tr></thead>
+              <thead><tr><th>代理</th><th>場地</th><th class="th-sortable text-right" data-sort="volume">洗碼量</th><th class="th-sortable text-right" data-sort="bonus">碼糧</th><th class="th-sortable text-right" data-sort="drawn">已提領</th><th class="th-sortable text-right" data-sort="undrawn">未提領</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -4719,6 +4737,6 @@ tr.rank-1 td {
     })();
   </script>
 
-  <!-- BUILD: v13.0.3 | 2026-06-24 | 2026-06-25T10:22:27.297Z -->
+  <!-- BUILD: v13.0.3 | 2026-06-24 | 2026-06-27T15:46:01.537Z -->
 </body>
 </html>
