@@ -8700,11 +8700,11 @@ function _renderAgentLedger(agent, filteredTxs, queryMonth) {
       kpiEl.appendChild(card);
     }
 
-    // ★ 直接顯示數字（不用 countUp 動畫，避免顯示 0）
+    // ★ countUp 动画
     var vals = kpiEl.querySelectorAll('.kpi-card-value');
     for (var j = 0; j < vals.length; j++) {
-      if (kpiItems[j] && kpiItems[j].raw != null) {
-        vals[j].textContent = '¥' + fmtMoney(kpiItems[j].raw);
+      if (kpiItems[j] && kpiItems[j].raw != null && typeof countUp === 'function') {
+        countUp(vals[j], kpiItems[j].raw, { prefix: '¥' });
       }
     }
 
@@ -10397,29 +10397,6 @@ function _renderAgentWalletCards() {
     if (empty) empty.style.display = 'block';
     return;
   }
-
-  // ★ DIAG: console 輸出每個代理的完整餘額計算（不影響 UI）
-  console.log('===== _renderAgentWalletCards: ' + agentList.length + ' 個代理 =====');
-  for (var diagIdx = 0; diagIdx < agentList.length; diagIdx++) {
-    var da = agentList[diagIdx];
-    var dBalance = calcAgentBalance(da, txs, agentWallets);
-    // 計算各分量
-    var dBonus = 0, dCash = 0, dDrawn = 0;
-    for (var di2 = 0; di2 < txs.length; di2++) {
-      if (txs[di2].agent === da) { dBonus += toNum(txs[di2].bonus); dCash += toNum(txs[di2].cash)||0; dDrawn += toNum(txs[di2].drawn); }
-    }
-    var dAwDep = 0, dAwCDep = 0, dAwWd = 0;
-    var dRecs = agentWallets[da] || [];
-    for (var dr = 0; dr < dRecs.length; dr++) {
-      if (dRecs[dr].type === 'deposit') dAwDep += toNum(dRecs[dr].amount);
-      else if (dRecs[dr].type === 'cash_deposit') dAwCDep += toNum(dRecs[dr].amount);
-      else dAwWd += toNum(dRecs[dr].amount);
-    }
-    console.log('  [' + da + '] 餘額=' + dBalance + ' | 碼糧=' + dBonus + ' 現金=' + dCash +
-      ' drawnSum=' + dDrawn + ' 存入=' + dAwDep + ' 自存=' + dAwCDep + ' 提領=' + dAwWd +
-      ' | 錢包記錄數=' + dRecs.length + ' | 公式:' + dBonus + '+' + dCash + '+' + dAwDep + '+' + dAwCDep + '-' + dDrawn + '-' + dAwWd + '=' + dBalance);
-  }
-  console.log('========================================');
 
   if (empty) empty.style.display = 'none';
 
@@ -12503,88 +12480,6 @@ function triggerJSONImport() {
   }
   input.click();
 }
-
-// ============================================================================
-// ★ 診斷工具 — 在 console 輸入 debugAgentBalance('Alen') 查看餘額計算明細
-// ============================================================================
-function debugAgentBalance(agentName) {
-  var txs = State.get('txs');
-  var wallets = State.get('agentWallets');
-  var records = wallets[agentName] || [];
-
-  var bonusSum = 0, cashSum = 0, drawnSum = 0;
-  var txDetails = [];
-  for (var i = 0; i < txs.length; i++) {
-    var tx = txs[i];
-    if (tx.agent === agentName) {
-      var b = toNum(tx.bonus);
-      var c = toNum(tx.cash) || 0;
-      var d = toNum(tx.drawn);
-      bonusSum += b;
-      cashSum += c;
-      drawnSum += d;
-      txDetails.push({ id: tx.id, date: tx.date, bonus: b, drawn: d, undrawn: toNum(tx.undrawn) });
-    }
-  }
-
-  var awDeposit = 0, awCashDep = 0, awWithdraw = 0;
-  var wDetails = [];
-  for (var j = 0; j < records.length; j++) {
-    var r = records[j];
-    var amt = toNum(r.amount);
-    if (r.type === 'deposit') { awDeposit += amt; }
-    else if (r.type === 'cash_deposit') { awCashDep += amt; }
-    else if (r.type === 'withdraw') { awWithdraw += amt; }
-    wDetails.push({ date: r.date, type: r.type, amount: amt });
-  }
-
-  var balance = Math.max(0, bonusSum + cashSum + awDeposit + awCashDep - drawnSum - awWithdraw);
-
-  // 額外：列出所有含 "YUKA" 或 "Alen" 等的模糊匹配（偵測名稱不一致）
-  var fuzzyMatches = [];
-  for (var fi = 0; fi < txs.length; fi++) {
-    if (txs[fi].agent && txs[fi].agent.indexOf(agentName) !== -1 && txs[fi].agent !== agentName) {
-      fuzzyMatches.push({ idx: fi, agent: txs[fi].agent, bonus: txs[fi].bonus || 0, drawn: txs[fi].drawn || 0 });
-    }
-  }
-
-  console.log('===== debugAgentBalance: ' + agentName + ' =====');
-  console.log('  搜尋 agent === ' + JSON.stringify(agentName) + ' (長度=' + agentName.length + ')');
-  console.log('  匹配交易: ' + txDetails.length + ' 筆 / 總交易: ' + txs.length + ' 筆');
-  console.log('  交易明細:');
-  txDetails.forEach(function(t) {
-    console.log('    #' + t.id + ' ' + t.date + '  碼糧=' + t.bonus + '  已領=' + t.drawn + '  未領=' + t.undrawn);
-  });
-  console.log('  --- 匯總 ---');
-  console.log('  碼糧合計 (bonusSum):  ' + bonusSum);
-  console.log('  現金寄放 (cashSum):    ' + cashSum);
-  console.log('  已領碼糧 (drawnSum):   ' + drawnSum + '  ← 如果這個不是 58823，代表資料被污染了');
-  console.log('  錢包存入 (awDeposit):  ' + awDeposit);
-  console.log('  自存現金 (awCashDep):  ' + awCashDep);
-  console.log('  錢包提領 (awWithdraw): ' + awWithdraw);
-  console.log('  --- 計算 ---');
-  console.log('  公式: ' + bonusSum + ' + ' + cashSum + ' + ' + awDeposit + ' + ' + awCashDep + ' - ' + drawnSum + ' - ' + awWithdraw);
-  console.log('  餘額 = ' + (bonusSum + cashSum + awDeposit + awCashDep - drawnSum - awWithdraw));
-  console.log('  Math.max(0, ...) = ' + balance);
-  console.log('  錢包記錄:');
-  wDetails.forEach(function(w) {
-    console.log('    ' + w.date + '  ' + w.type + '  ' + w.amount);
-  });
-  if (fuzzyMatches.length > 0) {
-    console.log('  ⚠️ 模糊匹配（包含 "' + agentName + '" 但不完全相等）:');
-    fuzzyMatches.forEach(function(f) {
-      console.log('    [#' + f.idx + '] agent=' + JSON.stringify(f.agent) + ' bonus=' + f.bonus + ' drawn=' + f.drawn);
-    });
-  } else {
-    console.log('  （無模糊匹配，所有含 "' + agentName + '" 的交易都已精確匹配）');
-  }
-  console.log('=================================');
-
-  return { bonusSum: bonusSum, cashSum: cashSum, drawnSum: drawnSum, awDeposit: awDeposit, awCashDep: awCashDep, awWithdraw: awWithdraw, balance: balance, txDetails: txDetails, wDetails: wDetails };
-}
-
-// 掛到全局
-window.debugAgentBalance = debugAgentBalance;
 
 // src/app.js
 /**
