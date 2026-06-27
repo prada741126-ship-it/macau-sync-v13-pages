@@ -12481,6 +12481,67 @@ function triggerJSONImport() {
   input.click();
 }
 
+// ============================================================================
+// ★ 診斷工具 — 在 console 輸入 debugAgentBalance('Alen') 查看餘額計算明細
+// ============================================================================
+function debugAgentBalance(agentName) {
+  var txs = State.get('txs');
+  var wallets = State.get('agentWallets');
+  var records = wallets[agentName] || [];
+
+  var bonusSum = 0, cashSum = 0, drawnSum = 0;
+  var txDetails = [];
+  for (var i = 0; i < txs.length; i++) {
+    var tx = txs[i];
+    if (tx.agent === agentName) {
+      var b = toNum(tx.bonus);
+      var c = toNum(tx.cash) || 0;
+      var d = toNum(tx.drawn);
+      bonusSum += b;
+      cashSum += c;
+      drawnSum += d;
+      txDetails.push({ id: tx.id, date: tx.date, bonus: b, drawn: d, undrawn: toNum(tx.undrawn) });
+    }
+  }
+
+  var awDeposit = 0, awCashDep = 0, awWithdraw = 0;
+  var wDetails = [];
+  for (var j = 0; j < records.length; j++) {
+    var r = records[j];
+    var amt = toNum(r.amount);
+    if (r.type === 'deposit') { awDeposit += amt; }
+    else if (r.type === 'cash_deposit') { awCashDep += amt; }
+    else if (r.type === 'withdraw') { awWithdraw += amt; }
+    wDetails.push({ date: r.date, type: r.type, amount: amt });
+  }
+
+  var balance = Math.max(0, bonusSum + cashSum + awDeposit + awCashDep - drawnSum - awWithdraw);
+
+  console.log('===== debugAgentBalance: ' + agentName + ' =====');
+  console.log('  交易明細:');
+  txDetails.forEach(function(t) {
+    console.log('    #' + t.id + ' ' + t.date + '  碼糧=' + t.bonus + '  已領=' + t.drawn + '  未領=' + t.undrawn);
+  });
+  console.log('  --- 匯總 ---');
+  console.log('  碼糧合計 (bonusSum):  ' + bonusSum);
+  console.log('  現金寄放 (cashSum):    ' + cashSum);
+  console.log('  已領碼糧 (drawnSum):   ' + drawnSum + '  ← 如果這個不是 58823，代表資料被污染了');
+  console.log('  錢包存入 (awDeposit):  ' + awDeposit);
+  console.log('  自存現金 (awCashDep):  ' + awCashDep);
+  console.log('  錢包提領 (awWithdraw): ' + awWithdraw);
+  console.log('  --- 計算 ---');
+  console.log('  公式: ' + bonusSum + ' + ' + cashSum + ' + ' + awDeposit + ' + ' + awCashDep + ' - ' + drawnSum + ' - ' + awWithdraw);
+  console.log('  餘額 = ' + (bonusSum + cashSum + awDeposit + awCashDep - drawnSum - awWithdraw));
+  console.log('  Math.max(0, ...) = ' + balance);
+  console.log('  錢包記錄:');
+  wDetails.forEach(function(w) {
+    console.log('    ' + w.date + '  ' + w.type + '  ' + w.amount);
+  });
+  console.log('=================================');
+
+  return { bonusSum: bonusSum, cashSum: cashSum, drawnSum: drawnSum, awDeposit: awDeposit, awCashDep: awCashDep, awWithdraw: awWithdraw, balance: balance, txDetails: txDetails, wDetails: wDetails };
+}
+
 // src/app.js
 /**
  * v13 App 入口 — 系统初始化
