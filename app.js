@@ -8753,7 +8753,7 @@ function _renderAgentLedger(agent, filteredTxs, queryMonth) {
       if (dateTo && e.date > dateTo) continue;
     }
 
-    running += e.bonus;
+    running += e.bonus - (e.drawn || 0);  // 碼糧收入增加，己領碼糧減少餘額
     var tr = h('tr');
 
     if (e.rowType === 'withdraw') {
