@@ -2195,30 +2195,31 @@ function calcFundBalance(txs, fundWithdrawals) {
 /**
  * 计算单个代理的钱包余额
  *
- * [修復 2026-06-27] 移除對 tx.drawn 的依賴。
- * 原公式用 Math.max(awWithdraw, drawnSum) 防雙重計算，但 syncAgentDrawn() 從未被調用，
- * 導致 drawnSum 永遠是舊值，餘額算不對。
+ * 餘額 = 碼糧 + 現金寄放 + 錢包存入 + 錢包自存現金 - 已領碼糧(tx.drawn) - 錢包提領
  *
- * 新公式：餘額 = 所有收入 - 錢包實際提領（以 wallet 記錄為準）
+ * 已領碼糧 (tx.drawn) 和錢包提領 (wallet withdraw) 是兩筆獨立的扣減，
+ * 必須分別減掉，不能取 max 也不能省略任何一項。
  *
  * @param {string} agentName - 代理名
- * @param {Array} txs - 交易數組
- * @param {object} agentWallets - 代理錢包 { agentName: [records] }
+ * @param {Array} txs - 交易数组
+ * @param {object} agentWallets - 代理钱包 { agentName: [records] }
  * @returns {number}
  */
 function calcAgentBalance(agentName, txs, agentWallets) {
-  // 从交易中计算该代理的碼糧和現金寄放（收入端）
+  // 从交易中计算该代理的碼糧、現金寄放、已領碼糧
   var bonusSum = 0;
   var cashSum = 0;
+  var drawnSum = 0;
   for (var i = 0; i < txs.length; i++) {
     var tx = txs[i];
     if (tx.agent === agentName) {
       bonusSum += toNum(tx.bonus);
       cashSum += toNum(tx.cash) || 0;
+      drawnSum += toNum(tx.drawn);
     }
   }
 
-  // 从代理钱包中计算存入和提領（支出端，以 wallet 記錄為準）
+  // 从代理钱包中计算存入和提領
   var awDeposit = 0;
   var awCashDep = 0;
   var awWithdraw = 0;
@@ -2234,8 +2235,8 @@ function calcAgentBalance(agentName, txs, agentWallets) {
     }
   }
 
-  // ★ 修正公式：所有收入 - 實際提領（不再依賴 tx.drawn / Math.max）
-  var balance = bonusSum + cashSum + awDeposit + awCashDep - awWithdraw;
+  // ★ 正確公式：所有收入 - 已領碼糧 - 錢包提領（兩筆獨立扣減）
+  var balance = bonusSum + cashSum + awDeposit + awCashDep - drawnSum - awWithdraw;
   return Math.max(0, balance);
 }
 
@@ -8549,10 +8550,14 @@ function _renderAgentLedger(agent, filteredTxs, queryMonth) {
     else awWithdraw += amt;
   }
 
-  // ★ [修復 2026-06-27] 已提領只算 wallet 記錄，不再加 tx.drawn（避免重複扣減）
-  // 原公式：allDrawn = tx.drawn + awWithdraw（雙重計算）
-  // 新公式：allDrawn = awWithdraw（以 wallet 提領記錄為準）
-  var allDrawn = awWithdraw;
+  // ★ 已領碼糧 (tx.drawn) 和錢包提領 (awWithdraw) 是兩筆獨立的扣減，都要減
+  var allDrawn = 0;
+  for (var i = 0; i < txs.length; i++) {
+    if (txs[i].agent === agent) {
+      allDrawn += (txs[i].drawn || 0);
+    }
+  }
+  allDrawn += awWithdraw;
 
   var awBalance = Math.max(0, allBonus + allCash + awDep + awCDep - allDrawn);
 
@@ -11553,8 +11558,6 @@ function deleteAgentWallet(agent, fbKey) {
   showConfirm('確定刪除此筆錢包記錄？', function() {
     var result = deleteWallet(agent, fbKey);
     if (result) {
-      // ★ [修復 2026-06-27] 刪除後重新同步 tx.drawn
-      try { syncAgentDrawn(agent); } catch(e) { console.error('[v13:bridge] syncAgentDrawn error:', e); }
       toastCRUDDone();
       refreshAllViews();
     } else {
@@ -11624,10 +11627,6 @@ function saveAgentWalletForm() {
 
   var record = createWallet(agent, data);
   if (record) {
-    // ★ [修復 2026-06-27] 提領/存入後同步 tx.drawn（交易明細的「已提領」欄位）
-    if (data.type === 'withdraw' || data.type === 'deposit') {
-      try { syncAgentDrawn(agent); } catch(e) { console.error('[v13:bridge] syncAgentDrawn error:', e); }
-    }
     closeModal('agent-wallet-modal');
     refreshAllViews();
     toastCRUDDone();
