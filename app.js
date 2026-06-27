@@ -8713,19 +8713,49 @@ function _renderAgentLedger(agent, filteredTxs, queryMonth) {
     btnDiv.innerHTML = '<button class="btn btn-sm btn-primary" onclick="openWalletModal(\'' + agent.replace(/'/g, "\\'") + '\')">＋ 異動</button>';
     kpiEl.appendChild(btnDiv);
 
-    // ★ DEBUG: 顯示計算明細（確認 allDrawn 是否正確）
-    var dbg = h('div', { style: 'margin-top:8px;padding:10px;background:rgba(255,0,0,0.08);border:1px solid rgba(255,0,0,0.25);border-radius:6px;font-size:12px;color:#f88;font-family:monospace;white-space:pre-wrap;' });
+    // ★ DEBUG: 顯示計算明細 — 印出原始交易資料確認 drawn 欄位
+    var allTxs = State.get('txs');
+    var matchTxs = [];
+    var sampleRaw = '';
+    for (var di = 0; di < allTxs.length; di++) {
+      if (allTxs[di].agent === agent) {
+        matchTxs.push(allTxs[di]);
+        if (matchTxs.length <= 5) {
+          var t = allTxs[di];
+          sampleRaw += '\n  [#' + di + '] agent=' + JSON.stringify(t.agent) +
+            ' bonus=' + (t.bonus || 0) +
+            ' drawn=' + JSON.stringify(t.drawn) +
+            ' cash=' + (t.cash || 0) +
+            ' undrawn=' + (t.undrawn || 0) +
+            ' date=' + (t.date || '') +
+            ' venue=' + (t.venue || '');
+        }
+      }
+    }
+
+    // 列出所有不包含 "drawn" 或 drawn=0 的匹配交易
+    var noDrawnCount = 0;
+    var hasDrawnCount = 0;
+    for (var dj = 0; dj < matchTxs.length; dj++) {
+      if (matchTxs[dj].drawn && toNum(matchTxs[dj].drawn) > 0) hasDrawnCount++;
+      else noDrawnCount++;
+    }
+
+    dbg = h('div', { style: 'margin-top:8px;padding:10px;background:rgba(255,0,0,0.08);border:1px solid rgba(255,0,0,0.25);border-radius:6px;font-size:12px;color:#f88;font-family:monospace;white-space:pre-wrap;' });
     dbg.textContent =
-      '[DEBUG] agent=' + agent +
+      '[DEBUG] agent=' + JSON.stringify(agent) +
+      '\n  匹配交易數: ' + matchTxs.length + ' / ' + allTxs.length +
+      '\n  有 drawn>0: ' + hasDrawnCount + ' 筆 | drawn=0/空: ' + noDrawnCount + ' 筆' +
       '\n  bonusSum(碼糧)=   ' + allBonus +
       '\n  cashSum(現金寄放)= ' + allCash +
-      '\n  drawnSum(tx.drawn)= ' + (function(){ var s=0; var t=State.get('txs'); for(var i=0;i<t.length;i++) if(t[i].agent===agent) s+=(t[i].drawn||0); return s; })() +
+      '\n  drawnSum(tx.drawn)= ' + drawnSum +
       '\n  awDeposit(存入)=    ' + awDep +
       '\n  awCashDep(自存現金)= ' + awCDep +
       '\n  awWithdraw(提領)=   ' + awWithdraw +
       '\n  → allDrawn =       ' + allDrawn +
       '\n  → awBalance(餘額)= ' + awBalance +
-      '\n  公式: ' + allBonus + '+' + allCash + '+' + awDep + '+' + awCDep + '-' + allDrawn + ' = ' + awBalance;
+      '\n  公式: ' + allBonus + '+' + allCash + '+' + awDep + '+' + awCDep + '-' + allDrawn + ' = ' + awBalance +
+      '\n\n-- 前5筆匹配交易原始數據 --' + sampleRaw;
     kpiEl.appendChild(dbg);
   }
 
@@ -12532,7 +12562,17 @@ function debugAgentBalance(agentName) {
 
   var balance = Math.max(0, bonusSum + cashSum + awDeposit + awCashDep - drawnSum - awWithdraw);
 
+  // 額外：列出所有含 "YUKA" 或 "Alen" 等的模糊匹配（偵測名稱不一致）
+  var fuzzyMatches = [];
+  for (var fi = 0; fi < txs.length; fi++) {
+    if (txs[fi].agent && txs[fi].agent.indexOf(agentName) !== -1 && txs[fi].agent !== agentName) {
+      fuzzyMatches.push({ idx: fi, agent: txs[fi].agent, bonus: txs[fi].bonus || 0, drawn: txs[fi].drawn || 0 });
+    }
+  }
+
   console.log('===== debugAgentBalance: ' + agentName + ' =====');
+  console.log('  搜尋 agent === ' + JSON.stringify(agentName) + ' (長度=' + agentName.length + ')');
+  console.log('  匹配交易: ' + txDetails.length + ' 筆 / 總交易: ' + txs.length + ' 筆');
   console.log('  交易明細:');
   txDetails.forEach(function(t) {
     console.log('    #' + t.id + ' ' + t.date + '  碼糧=' + t.bonus + '  已領=' + t.drawn + '  未領=' + t.undrawn);
@@ -12552,6 +12592,14 @@ function debugAgentBalance(agentName) {
   wDetails.forEach(function(w) {
     console.log('    ' + w.date + '  ' + w.type + '  ' + w.amount);
   });
+  if (fuzzyMatches.length > 0) {
+    console.log('  ⚠️ 模糊匹配（包含 "' + agentName + '" 但不完全相等）:');
+    fuzzyMatches.forEach(function(f) {
+      console.log('    [#' + f.idx + '] agent=' + JSON.stringify(f.agent) + ' bonus=' + f.bonus + ' drawn=' + f.drawn);
+    });
+  } else {
+    console.log('  （無模糊匹配，所有含 "' + agentName + '" 的交易都已精確匹配）');
+  }
   console.log('=================================');
 
   return { bonusSum: bonusSum, cashSum: cashSum, drawnSum: drawnSum, awDeposit: awDeposit, awCashDep: awCashDep, awWithdraw: awWithdraw, balance: balance, txDetails: txDetails, wDetails: wDetails };
