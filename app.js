@@ -8700,11 +8700,11 @@ function _renderAgentLedger(agent, filteredTxs, queryMonth) {
       kpiEl.appendChild(card);
     }
 
-    // ★ countUp 动画
+    // ★ 直接顯示數字（不用 countUp 動畫，避免顯示 0）
     var vals = kpiEl.querySelectorAll('.kpi-card-value');
     for (var j = 0; j < vals.length; j++) {
-      if (kpiItems[j] && kpiItems[j].raw != null && typeof countUp === 'function') {
-        countUp(vals[j], kpiItems[j].raw, { prefix: '¥' });
+      if (kpiItems[j] && kpiItems[j].raw != null) {
+        vals[j].textContent = '¥' + fmtMoney(kpiItems[j].raw);
       }
     }
 
@@ -8712,6 +8712,21 @@ function _renderAgentLedger(agent, filteredTxs, queryMonth) {
     var btnDiv = h('div', { className: 'kpi-card', style: 'display:flex;align-items:center;justify-content:center;border-left:3px solid transparent' });
     btnDiv.innerHTML = '<button class="btn btn-sm btn-primary" onclick="openWalletModal(\'' + agent.replace(/'/g, "\\'") + '\')">＋ 異動</button>';
     kpiEl.appendChild(btnDiv);
+
+    // ★ DEBUG: 顯示計算明細（確認 allDrawn 是否正確）
+    var dbg = h('div', { style: 'margin-top:8px;padding:10px;background:rgba(255,0,0,0.08);border:1px solid rgba(255,0,0,0.25);border-radius:6px;font-size:12px;color:#f88;font-family:monospace;white-space:pre-wrap;' });
+    dbg.textContent =
+      '[DEBUG] agent=' + agent +
+      '\n  bonusSum(碼糧)=   ' + allBonus +
+      '\n  cashSum(現金寄放)= ' + allCash +
+      '\n  drawnSum(tx.drawn)= ' + (function(){ var s=0; var t=State.get('txs'); for(var i=0;i<t.length;i++) if(t[i].agent===agent) s+=(t[i].drawn||0); return s; })() +
+      '\n  awDeposit(存入)=    ' + awDep +
+      '\n  awCashDep(自存現金)= ' + awCDep +
+      '\n  awWithdraw(提領)=   ' + awWithdraw +
+      '\n  → allDrawn =       ' + allDrawn +
+      '\n  → awBalance(餘額)= ' + awBalance +
+      '\n  公式: ' + allBonus + '+' + allCash + '+' + awDep + '+' + awCDep + '-' + allDrawn + ' = ' + awBalance;
+    kpiEl.appendChild(dbg);
   }
 
   // === 表格 ===
