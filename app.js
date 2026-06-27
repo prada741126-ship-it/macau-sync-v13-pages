@@ -8712,51 +8712,6 @@ function _renderAgentLedger(agent, filteredTxs, queryMonth) {
     var btnDiv = h('div', { className: 'kpi-card', style: 'display:flex;align-items:center;justify-content:center;border-left:3px solid transparent' });
     btnDiv.innerHTML = '<button class="btn btn-sm btn-primary" onclick="openWalletModal(\'' + agent.replace(/'/g, "\\'") + '\')">＋ 異動</button>';
     kpiEl.appendChild(btnDiv);
-
-    // ★ DEBUG: 顯示計算明細 — 印出原始交易資料確認 drawn 欄位
-    var allTxs = State.get('txs');
-    var matchTxs = [];
-    var sampleRaw = '';
-    for (var di = 0; di < allTxs.length; di++) {
-      if (allTxs[di].agent === agent) {
-        matchTxs.push(allTxs[di]);
-        if (matchTxs.length <= 5) {
-          var t = allTxs[di];
-          sampleRaw += '\n  [#' + di + '] agent=' + JSON.stringify(t.agent) +
-            ' bonus=' + (t.bonus || 0) +
-            ' drawn=' + JSON.stringify(t.drawn) +
-            ' cash=' + (t.cash || 0) +
-            ' undrawn=' + (t.undrawn || 0) +
-            ' date=' + (t.date || '') +
-            ' venue=' + (t.venue || '');
-        }
-      }
-    }
-
-    // 列出所有不包含 "drawn" 或 drawn=0 的匹配交易
-    var noDrawnCount = 0;
-    var hasDrawnCount = 0;
-    for (var dj = 0; dj < matchTxs.length; dj++) {
-      if (matchTxs[dj].drawn && toNum(matchTxs[dj].drawn) > 0) hasDrawnCount++;
-      else noDrawnCount++;
-    }
-
-    dbg = h('div', { style: 'margin-top:8px;padding:10px;background:rgba(255,0,0,0.08);border:1px solid rgba(255,0,0,0.25);border-radius:6px;font-size:12px;color:#f88;font-family:monospace;white-space:pre-wrap;' });
-    dbg.textContent =
-      '[DEBUG] agent=' + JSON.stringify(agent) +
-      '\n  匹配交易數: ' + matchTxs.length + ' / ' + allTxs.length +
-      '\n  有 drawn>0: ' + hasDrawnCount + ' 筆 | drawn=0/空: ' + noDrawnCount + ' 筆' +
-      '\n  bonusSum(碼糧)=   ' + allBonus +
-      '\n  cashSum(現金寄放)= ' + allCash +
-      '\n  drawnSum(tx.drawn)= ' + (allDrawn - awWithdraw) +
-      '\n  awDeposit(存入)=    ' + awDep +
-      '\n  awCashDep(自存現金)= ' + awCDep +
-      '\n  awWithdraw(提領)=   ' + awWithdraw +
-      '\n  → allDrawn =       ' + allDrawn +
-      '\n  → awBalance(餘額)= ' + awBalance +
-      '\n  公式: ' + allBonus + '+' + allCash + '+' + awDep + '+' + awCDep + '-' + allDrawn + ' = ' + awBalance +
-      '\n\n-- 前5筆匹配交易原始數據 --' + sampleRaw;
-    kpiEl.appendChild(dbg);
   }
 
   // === 表格 ===
@@ -10442,6 +10397,29 @@ function _renderAgentWalletCards() {
     if (empty) empty.style.display = 'block';
     return;
   }
+
+  // ★ DIAG: console 輸出每個代理的完整餘額計算（不影響 UI）
+  console.log('===== _renderAgentWalletCards: ' + agentList.length + ' 個代理 =====');
+  for (var diagIdx = 0; diagIdx < agentList.length; diagIdx++) {
+    var da = agentList[diagIdx];
+    var dBalance = calcAgentBalance(da, txs, agentWallets);
+    // 計算各分量
+    var dBonus = 0, dCash = 0, dDrawn = 0;
+    for (var di2 = 0; di2 < txs.length; di2++) {
+      if (txs[di2].agent === da) { dBonus += toNum(txs[di2].bonus); dCash += toNum(txs[di2].cash)||0; dDrawn += toNum(txs[di2].drawn); }
+    }
+    var dAwDep = 0, dAwCDep = 0, dAwWd = 0;
+    var dRecs = agentWallets[da] || [];
+    for (var dr = 0; dr < dRecs.length; dr++) {
+      if (dRecs[dr].type === 'deposit') dAwDep += toNum(dRecs[dr].amount);
+      else if (dRecs[dr].type === 'cash_deposit') dAwCDep += toNum(dRecs[dr].amount);
+      else dAwWd += toNum(dRecs[dr].amount);
+    }
+    console.log('  [' + da + '] 餘額=' + dBalance + ' | 碼糧=' + dBonus + ' 現金=' + dCash +
+      ' drawnSum=' + dDrawn + ' 存入=' + dAwDep + ' 自存=' + dAwCDep + ' 提領=' + dAwWd +
+      ' | 錢包記錄數=' + dRecs.length + ' | 公式:' + dBonus + '+' + dCash + '+' + dAwDep + '+' + dAwCDep + '-' + dDrawn + '-' + dAwWd + '=' + dBalance);
+  }
+  console.log('========================================');
 
   if (empty) empty.style.display = 'none';
 
@@ -12604,6 +12582,9 @@ function debugAgentBalance(agentName) {
 
   return { bonusSum: bonusSum, cashSum: cashSum, drawnSum: drawnSum, awDeposit: awDeposit, awCashDep: awCashDep, awWithdraw: awWithdraw, balance: balance, txDetails: txDetails, wDetails: wDetails };
 }
+
+// 掛到全局
+window.debugAgentBalance = debugAgentBalance;
 
 // src/app.js
 /**
