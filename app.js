@@ -12734,11 +12734,8 @@ function triggerJSONImport() {
     // 填充下拉
     try { _populateDropdowns(); } catch(e) { console.error('[v13:app] populateDropdowns error:', e); }
 
-    // 启动 Firebase 监听器 (非致命) — watchers 在连线建立后会自动拉取远端数据
-    try { startWatchers(); } catch(e) { console.warn('[v13:app] startWatchers error:', e); }
-
-    // 立即推送本地数据到 Firebase（异步安全网）
-    try { syncUploadAll(); } catch(e) { console.warn('[v13:app] syncUploadAll error:', e); }
+    // 注意: Firebase watchers 和同步由 firebase.js 的 _onFirebaseReady() 在匿名认证完成后自动启动
+    // 不要在这里直接调用 startWatchers() / syncUploadAll()，否则会在 auth 完成前触发 permission_denied
 
     // 渲染: 加 try-catch 确保一个页面失败不影响其他
     try { renderOverview(); } catch(e) { console.error('[v13:app] renderOverview error:', e); }
