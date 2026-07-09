@@ -5176,24 +5176,25 @@ function _doInitFirebase(onReady) {
     if (!firebase.apps.length) {
       firebase.initializeApp(FIREBASE_CONFIG);
     }
+
+    // 必须等待 firebase-auth-compat.js 加载完成
+    if (typeof firebase.auth !== 'function') {
+      console.log('[v13:firebase] ⏳ Auth SDK not ready yet, retrying...');
+      return null; // 返回 null，让轮询继续
+    }
+
     _db = firebase.database();
 
     // Anonymous auth — RTDB 读写都需要认证完成后才能操作
-    if (typeof firebase.auth === 'function') {
-      firebase.auth().signInAnonymously().then(function() {
-        console.log('[v13:firebase] 🔑 Anonymous auth OK');
-        if (typeof onReady === 'function') onReady();
-      }).catch(function(err) {
-        console.error('[v13:firebase] ❌ Anonymous auth failed:', err.message);
-        // 即使 auth 失败也尝试继续，让后续错误自然暴露
-        if (typeof onReady === 'function') onReady();
-      });
-    } else {
-      console.warn('[v13:firebase] ⚠️ Auth SDK not loaded — sync writes may fail');
+    firebase.auth().signInAnonymously().then(function() {
+      console.log('[v13:firebase] 🔑 Anonymous auth OK');
       if (typeof onReady === 'function') onReady();
-    }
+    }).catch(function(err) {
+      console.error('[v13:firebase] ❌ Anonymous auth failed:', err.message);
+      if (typeof onReady === 'function') onReady();
+    });
 
-    console.log('[v13:firebase] ✅ Connected! _db ready, database:', _db.ref.toString().substring(0,30));
+    console.log('[v13:firebase] ✅ Connected! _db ready');
     _watchConnection();
     return _db;
   } catch (e) {
