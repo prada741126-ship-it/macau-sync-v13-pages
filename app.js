@@ -5166,9 +5166,11 @@ var _fbPollTimer = null;     // 轮询定时器
 
 /**
  * 真正执行 Firebase 初始化
+ * 必须先完成匿名认证，再启动 watchers + 同步，否则 permission_denied
+ * @param {function} onReady - 认证完成后调用
  * @returns {object|null}
  */
-function _doInitFirebase() {
+function _doInitFirebase(onReady) {
   if (typeof firebase === 'undefined') return null;
   try {
     if (!firebase.apps.length) {
@@ -5176,15 +5178,19 @@ function _doInitFirebase() {
     }
     _db = firebase.database();
 
-    // Anonymous auth — RTDB write access requires authentication
+    // Anonymous auth — RTDB 读写都需要认证完成后才能操作
     if (typeof firebase.auth === 'function') {
       firebase.auth().signInAnonymously().then(function() {
         console.log('[v13:firebase] 🔑 Anonymous auth OK');
+        if (typeof onReady === 'function') onReady();
       }).catch(function(err) {
         console.error('[v13:firebase] ❌ Anonymous auth failed:', err.message);
+        // 即使 auth 失败也尝试继续，让后续错误自然暴露
+        if (typeof onReady === 'function') onReady();
       });
     } else {
       console.warn('[v13:firebase] ⚠️ Auth SDK not loaded — sync writes may fail');
+      if (typeof onReady === 'function') onReady();
     }
 
     console.log('[v13:firebase] ✅ Connected! _db ready, database:', _db.ref.toString().substring(0,30));
@@ -5198,6 +5204,7 @@ function _doInitFirebase() {
 
 /**
  * 初始化成功后补启动 watchers + 同步
+ * 必须在匿名认证完成后调用
  */
 function _onFirebaseReady() {
   console.log('[v13:firebase] 🚀 Starting watchers + sync...');
@@ -5210,24 +5217,25 @@ function _onFirebaseReady() {
  * 1. 立即尝试（如果 SDK 已加载）
  * 2. load 事件重试（兼容 document.readyState===complete）
  * 3. 1秒间隔轮询 最多 30 次
+ * 关键：必须先完成匿名认证，再启动 watchers，否则 permission_denied
  * @returns {object|null} database 实例，未就绪时返回 null
  */
 function initFirebase() {
   // 如果已经连上了，直接返回
   if (_db) return _db;
 
-  // 立即尝试
-  var result = _doInitFirebase();
+  // 立即尝试 — 传入 onReady 回调，auth 完成后才启动 watchers
+  var result = _doInitFirebase(function onReady() {
+    _onFirebaseReady();
+  });
   if (result) {
     _fbRetryDone = true;
-    // ★ 首次成功也触发 onFirebaseReady（延迟，等连接真正建立后再同步）
-    // 但不在 initAppAfterLogin 之前启动 watchers，避免与后续 initAppAfterLogin 双重注册
-    // 标记需要延迟同步，由 _watchConnection 在连通时触发
+    // _onFirebaseReady 会在 signInAnonymously().then() 中调用
     return result;
   }
 
   // 还没连上 — 安排重试
-  if (_fbRetryDone) return null;  // 已经安排过了
+  if (_fbRetryDone) return null;
   _fbRetryDone = true;
 
   console.warn('[v13:firebase] Firebase SDK not loaded yet, setting up retry...');
@@ -5236,8 +5244,9 @@ function initFirebase() {
   function tryInitViaEvent() {
     if (!_db) {
       console.log('[v13:firebase] ⏳ Retry via event...');
-      _doInitFirebase();
-      if (_db) _onFirebaseReady();
+      _doInitFirebase(function onReady() {
+        _onFirebaseReady();
+      });
     }
   }
 
@@ -5255,12 +5264,13 @@ function initFirebase() {
     pollCount++;
     if (typeof firebase !== 'undefined' && !_db) {
       console.log('[v13:firebase] ⏳ Poll #' + pollCount + ' — Firebase SDK detected, initializing...');
-      _doInitFirebase();
-      if (_db) {
-        clearInterval(_fbPollTimer);
-        _fbPollTimer = null;
+      _doInitFirebase(function onReady() {
+        if (_fbPollTimer) {
+          clearInterval(_fbPollTimer);
+          _fbPollTimer = null;
+        }
         _onFirebaseReady();
-      }
+      });
     }
     if (pollCount >= 30) {
       clearInterval(_fbPollTimer);
